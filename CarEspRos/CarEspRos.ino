@@ -7,8 +7,8 @@
 #define DEBUG 1
 
 int spd=800;
-int lpwm=0;
-int rpwm=0;
+int lpwm=spd;
+int rpwm=spd;
 int len=300; // period in ms
 int lmc=0;   // left motor counter
 int rmc=0;   // right motor counter
@@ -69,8 +69,7 @@ void stop(void)
     analogWrite(D2, 0);
 }
  
-void forward(void)
-{
+void forward(void) {
     analogWrite(D1, lpwm);
     analogWrite(D2, rpwm);
     digitalWrite(D3, HIGH);
@@ -79,8 +78,7 @@ void forward(void)
     stop();
 }
  
-void backward(void)
-{
+void backward(void) {
     analogWrite(D1, lpwm);
     analogWrite(D2, rpwm);
     digitalWrite(D3, LOW);
@@ -89,8 +87,7 @@ void backward(void)
     stop();
 }
  
-void left(void)
-{
+void left(void) {
     analogWrite(D1, lpwm);
     analogWrite(D2, rpwm);
     digitalWrite(D3, LOW);
@@ -99,8 +96,7 @@ void left(void)
     stop();
 }
  
-void right(void)
-{
+void right(void) {
     analogWrite(D1, lpwm);
     analogWrite(D2, rpwm);
     digitalWrite(D3, HIGH);
@@ -109,7 +105,7 @@ void right(void)
     stop();
 }
  
-void lencode(){
+void lencode() {
   lmc=lmc+ldir;
 }
 void rencode(){
