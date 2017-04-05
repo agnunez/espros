@@ -1,8 +1,20 @@
+////////////////////////////////
+//
+// Wifi ROS Car with ESP8266 and
+// utlrosonic range servo
+//
+// Find last versions at:
+// https://github.com/agnunez/espros.git
+//
+// MIT License 2017 Agustin Nunez
+/////////////////////////////////
+
 #include <ESP8266WiFi.h>
 #include <ros.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Int16.h>
 #include <std_msgs/Float64.h>
+#include <Servo.h>
 
 #define DEBUG 1
 
@@ -27,11 +39,14 @@ int rtp=0;
 const char* ssid = "***";
 const char* password = "***";
 
-IPAddress server(192, 168, 1, 100);
+//IPAddress server(192, 168, 1, 100);
+IPAddress server(161, 72, 124, 168);
 IPAddress ip_address;
 int status = WL_IDLE_STATUS;
 
 WiFiClient client;
+Servo s;
+int i;
 
 class WiFiHardware {
 
@@ -145,6 +160,11 @@ void backwardCallback(const std_msgs::Int16& msg) {
   backward();
 }
 
+void chatterCallback(const std_msgs::Int16& msg) {
+  i = abs(msg.data);
+  s.write(i);
+}
+
 std_msgs::String str_msg;
 std_msgs::Int16 int_msg;
 ros::Publisher leftenc("/car/leftencoder", &int_msg);
@@ -154,6 +174,7 @@ ros::Subscriber<std_msgs::Int16> sub_f("/car/forward", &forwardCallback);
 ros::Subscriber<std_msgs::Int16> sub_b("/car/backward", &backwardCallback);
 ros::Subscriber<std_msgs::Int16> sub_l("/car/left", &leftCallback);
 ros::Subscriber<std_msgs::Int16> sub_r("/car/right", &rightCallback);
+ros::Subscriber<std_msgs::Int16> sub("/car/angle", &chatterCallback);
 ros::NodeHandle_<WiFiHardware> nh;
 
 void setupWiFi()
@@ -181,6 +202,7 @@ void setup() {
   nh.subscribe(sub_l);
   nh.subscribe(sub_f);
   nh.subscribe(sub_b);
+  nh.subscribe(sub);
 
   pinMode(D1, OUTPUT); // 1,2EN aka D1 pwm left
   pinMode(D2, OUTPUT); // 3,4EN aka D2 pwm right
@@ -199,6 +221,7 @@ void setup() {
   timer1_attachInterrupt(tic);
   timer1_enable(TIM_DIV1, TIM_EDGE, TIM_LOOP);
   timer1_write(8000000);
+  s.attach(D2);
 }
 
 void loop() {
