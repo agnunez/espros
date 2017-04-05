@@ -3,8 +3,9 @@ ROS serial for ESP8266 through WiFi
 
 2017 Agustin Nunez (https://github.com/agnunez/espros.git) 
 
-This is an adaptation of ROS-serial-arduino to run on ESP8266 using wireless WiFi
-instead of wired USB UART cable
+This is an adaptation of ROS-serial-arduino to run on an stand-alone ESP8266 with WiFi
+instead of wired USB UART cable, based on http://answers.ros.org/users/1034/ahendrix/
+proposed solution for Arduino with WiFi shield.
 
 The reason being that ESP8266 (or ESP32) are much powerful and cheaper tha AVR Arduinos
 with more memory and speed and integrating WiFi for 10 times less cost. The use of I2C 
