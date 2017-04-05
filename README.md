@@ -32,14 +32,21 @@ correspond to its gpio pin ESP12E number, (i.e. 2,12,13,15)
 CarEspRos
 
 NodeMCU with motor shield and 2 DC motors plus infrared encoders wheels (DoIt car) implementation in ROS WiFi
-with esproswifi approach. Encoder counters are pusblished and basic movement with time lenth as subscritions.
+with esproswifi approach. Encoder counters are pusblished and basic movement with time length as subscriptions.
 Car is moved with messages like: 
 
-$ rostopic pub -1 /car/forward std_msgs/Int16 1000 // to move foward 1000 ms
+$ rostopic pub -1 /car/forward std_msgs/Int16 1000 // to move foward 1000 ms, use backward, right or left
 
 Car encoders can be read with:
 
 $ rostopic echo /car/leftencoder
+
+CarEspRosServo
+
+This is a version of CarEspRos above with addition of Servo in D7 nodeMCU pin (GPIO13 of ESP12). This Servo
+ROS subscription can be used, to rotate a Steering Wheel, or other usages. See later. Message to publish is:
+
+$ rostopic pub -1 /car/angle std_msgs/Int16 80  // to adjust to Servo center angle (min:0, max:255)
 
 This code is part of a much larger project to build an open source ROS Robot, called Gara
 
