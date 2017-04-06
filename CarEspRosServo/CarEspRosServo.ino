@@ -16,7 +16,7 @@
 #include <std_msgs/Float64.h>
 #include <Servo.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 int spd=800;
 int lpwm=spd;
@@ -36,11 +36,10 @@ int rtp=0;
 //////////////////////
 // WiFi Definitions //
 //////////////////////
-const char* ssid = "GTC-Guest";
-const char* password = ".gtcguest.";
+const char* ssid = "***";
+const char* password = "***";
 
-//IPAddress server(192, 168, 1, 100);
-IPAddress server(161, 72, 124, 168);
+IPAddress server(192, 168, 1, 100);
 IPAddress ip_address;
 int status = WL_IDLE_STATUS;
 
@@ -78,50 +77,23 @@ class WiFiHardware {
   }
 };
 
-void stop(void)
+void stop(void)      // Stop both motors
 {
     analogWrite(D1, 0);
     analogWrite(D2, 0);
 }
  
-void forward(void) {
-    analogWrite(D1, lpwm);
-    analogWrite(D2, rpwm);
-    digitalWrite(D3, HIGH);
-    digitalWrite(D4, HIGH);
-    delay(len);
-    stop();
-}
- 
-void backward(void) {
-    analogWrite(D1, lpwm);
-    analogWrite(D2, rpwm);
-    digitalWrite(D3, LOW);
-    digitalWrite(D4, LOW);
-    delay(len);
-    stop();
-}
- 
-void left(void) {
-    analogWrite(D1, lpwm);
-    analogWrite(D2, rpwm);
-    digitalWrite(D3, LOW);
-    digitalWrite(D4, HIGH);
-    delay(len);
-    stop();
-}
- 
-void right(void) {
-    analogWrite(D1, lpwm);
-    analogWrite(D2, rpwm);
-    digitalWrite(D3, HIGH);
-    digitalWrite(D4, LOW);
-    delay(len);
-    stop();
-}
-
-void motion(int lpw, int rpw, int llevel, int rlevel, int steps) {
-    if rlevel
+void motion(int lpw, int rpw, int llevel, int rlevel, int steps) {  // generic motion with "steps" duration in milisecods
+    if (llevel==HIGH) {
+      ldir=1; 
+    } else {
+      ldir=-1;
+    }
+    if (rlevel==HIGH) {
+      rdir=1; 
+    } else {
+      rdir=-1;
+    }
     analogWrite(D1, lpw);
     analogWrite(D2, rpw);
     digitalWrite(D3, llevel);
@@ -129,13 +101,14 @@ void motion(int lpw, int rpw, int llevel, int rlevel, int steps) {
     delay(steps);
     stop();
 }
-
+//// GPIO ISR Interrupt service routines for encoder changes
 void lencode() {
   lmc=lmc+ldir;
 }
 void rencode(){ 
   rmc=rmc+rdir;
 }
+//// Speed (lv,rv) calculation every timer tic
 void tic(void){ 
   lv=lmc-lmc0;
   lmc0=lmc;
@@ -143,38 +116,29 @@ void tic(void){
   rmc0=rmc0;
 }
 
+////  All subscriber messages callbacks here
 void leftCallback(const std_msgs::Int16& msg) {
   len = abs(msg.data);
-  ldir=-1;
-  rdir=1;
   motion(lpwm,rpwm,LOW,HIGH,len);
 }
 void rightCallback(const std_msgs::Int16& msg) {
   len = abs(msg.data);
-  ldir=1;
-  rdir=-1;
-  right();
+  motion(lpwm,rpwm,HIGH,LOW,len);
 }
-
 void forwardCallback(const std_msgs::Int16& msg) {
   len = abs(msg.data);
-  ldir=1;
-  rdir=1;            
-  forward();
+  motion(lpwm,rpwm,HIGH,HIGH,len);
 }
-
 void backwardCallback(const std_msgs::Int16& msg) {
   len = abs(msg.data);
-  ldir=-1;
-  rdir=-1;
-  backward();
+  motion(lpwm,rpwm,LOW,LOW,len);
 }
-
-void chatterCallback(const std_msgs::Int16& msg) {
+void angleCallback(const std_msgs::Int16& msg) {
   i = abs(msg.data);
   s.write(i);
 }
 
+/// ROS topics object definitions
 std_msgs::String str_msg;
 std_msgs::Int16 int_msg;
 ros::Publisher leftenc("/car/leftencoder", &int_msg);
@@ -184,9 +148,10 @@ ros::Subscriber<std_msgs::Int16> sub_f("/car/forward", &forwardCallback);
 ros::Subscriber<std_msgs::Int16> sub_b("/car/backward", &backwardCallback);
 ros::Subscriber<std_msgs::Int16> sub_l("/car/left", &leftCallback);
 ros::Subscriber<std_msgs::Int16> sub_r("/car/right", &rightCallback);
-ros::Subscriber<std_msgs::Int16> sub("/car/angle", &chatterCallback);
+ros::Subscriber<std_msgs::Int16> sub("/car/angle", &angleCallback);
 ros::NodeHandle_<WiFiHardware> nh;
 
+/// connect to ROS server WiFi as a client
 void setupWiFi()
 {
   WiFi.begin(ssid, password);
@@ -249,5 +214,5 @@ void loop() {
   int_msg.data = rmc;
   rightenc.publish( &int_msg );
   nh.spinOnce();
-  delay(500);
+  delay(200);
 }
