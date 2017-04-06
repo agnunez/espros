@@ -36,11 +36,11 @@ int rtp=0;
 //////////////////////
 // WiFi Definitions //
 //////////////////////
-const char* ssid = "***";
-const char* password = "***";
+const char* ssid = "Home";
+const char* password = "!28081958AGUSTINNUNEZ!";
 
-//IPAddress server(192, 168, 1, 100);
-IPAddress server(161, 72, 124, 168);
+IPAddress server(192, 168, 1, 100);
+//IPAddress server(161, 72, 124, 168);
 IPAddress ip_address;
 int status = WL_IDLE_STATUS;
 
@@ -221,7 +221,7 @@ void setup() {
   timer1_attachInterrupt(tic);
   timer1_enable(TIM_DIV1, TIM_EDGE, TIM_LOOP);
   timer1_write(8000000);
-  s.attach(D2);
+  s.attach(D7);
 }
 
 void loop() {
