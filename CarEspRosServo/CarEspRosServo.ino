@@ -36,11 +36,11 @@ int rtp=0;
 //////////////////////
 // WiFi Definitions //
 //////////////////////
-const char* ssid = "Home";
-const char* password = "!28081958AGUSTINNUNEZ!";
+const char* ssid = "GTC-Guest";
+const char* password = ".gtcguest.";
 
-IPAddress server(192, 168, 1, 100);
-//IPAddress server(161, 72, 124, 168);
+//IPAddress server(192, 168, 1, 100);
+IPAddress server(161, 72, 124, 168);
 IPAddress ip_address;
 int status = WL_IDLE_STATUS;
 
@@ -119,14 +119,24 @@ void right(void) {
     delay(len);
     stop();
 }
- 
+
+void motion(int lpw, int rpw, int llevel, int rlevel, int steps) {
+    if rlevel
+    analogWrite(D1, lpw);
+    analogWrite(D2, rpw);
+    digitalWrite(D3, llevel);
+    digitalWrite(D4, rlevel);
+    delay(steps);
+    stop();
+}
+
 void lencode() {
   lmc=lmc+ldir;
 }
-void rencode(){
+void rencode(){ 
   rmc=rmc+rdir;
 }
-void tic(void){
+void tic(void){ 
   lv=lmc-lmc0;
   lmc0=lmc;
   rv=rmc-rmc0;
@@ -137,7 +147,7 @@ void leftCallback(const std_msgs::Int16& msg) {
   len = abs(msg.data);
   ldir=-1;
   rdir=1;
-  left();
+  motion(lpwm,rpwm,LOW,HIGH,len);
 }
 void rightCallback(const std_msgs::Int16& msg) {
   len = abs(msg.data);
@@ -180,19 +190,28 @@ ros::NodeHandle_<WiFiHardware> nh;
 void setupWiFi()
 {
   WiFi.begin(ssid, password);
-  Serial.print("\nConnecting to "); Serial.println(ssid);
+  if(DEBUG) {
+    Serial.print("\nConnecting to "); 
+    Serial.println(ssid);
+  }
   uint8_t i = 0;
   while (WiFi.status() != WL_CONNECTED && i++ < 20) delay(500);
   if(i == 21){
-    Serial.print("Could not connect to"); Serial.println(ssid);
+    if(DEBUG){
+      Serial.print("Could not connect to: "); 
+      Serial.println(ssid);
+    }
     while(1) delay(500);
   }
-  Serial.print("Ready! Use ");
-  Serial.println(WiFi.localIP());
+  if(DEBUG){
+    Serial.print("Ready to use ");
+    Serial.println(WiFi.localIP());
+  }
+  
 }
 
 void setup() {
-  Serial.begin(115200);
+  if(DEBUG)Serial.begin(115200);
   setupWiFi();
   delay(2000);
   nh.initNode();
