@@ -1,7 +1,7 @@
 ////////////////////////////////
 //
-// Wifi ROS Car with ESP8266 and
-// utlrosonic range servo
+// Wifi ROS Car with ESP8266 NodeMCU
+// two DC motors and a servo
 //
 // Find last versions at:
 // https://github.com/agnunez/espros.git
@@ -17,8 +17,6 @@
 #include <Servo.h>
 
 #define DEBUG 0
-#define TRIGGER D0  // ultrasonic trigger pin
-#define ECHO    D8  // ultrasonic echo pin
 
 int spd=800;
 int lpwm=spd;
@@ -145,7 +143,6 @@ std_msgs::String str_msg;
 std_msgs::Int16 int_msg;
 ros::Publisher leftenc("/car/leftencoder", &int_msg);
 ros::Publisher rightenc("/car/rightencoder", &int_msg);
-ros::Publisher range("/car/range", &int_msg);
 
 ros::Subscriber<std_msgs::Int16> sub_f("/car/forward", &forwardCallback);
 ros::Subscriber<std_msgs::Int16> sub_b("/car/backward", &backwardCallback);
@@ -178,22 +175,6 @@ void setupWiFi()
   
 }
 
-int srange(){
-  long duration, distance;
-  digitalWrite(TRIGGER, LOW);  
-  delayMicroseconds(2); 
-  
-  digitalWrite(TRIGGER, HIGH);
-  delayMicroseconds(10); 
-  
-  digitalWrite(TRIGGER, LOW);
-  duration = pulseIn(ECHO, HIGH);
-  distance = (duration/2) / 29.1;
-  if(DEBUG){
-    Serial.print(distance);
-    Serial.println("Centimeter:");
-  }
-}
 void setup() {
   if(DEBUG)Serial.begin(115200);
   setupWiFi();
@@ -201,14 +182,12 @@ void setup() {
   nh.initNode();
   nh.advertise(leftenc);
   nh.advertise(rightenc);
-  nh.advertise(range);
   nh.subscribe(sub_r);
   nh.subscribe(sub_l);
   nh.subscribe(sub_f);
   nh.subscribe(sub_b);
   nh.subscribe(sub);
 
-  pinMode(D0, OUTPUT); // Ultrasonic Trigger
   pinMode(D1, OUTPUT); // 1,2EN aka D1 pwm left
   pinMode(D2, OUTPUT); // 3,4EN aka D2 pwm right
   pinMode(D3, OUTPUT); // 1A,2A aka D3
@@ -216,7 +195,7 @@ void setup() {
   pinMode(D5, INPUT); //  Left encoder
   pinMode(D6, INPUT); //  Right encoder
   s.attach(D7);       //  Servo PWM
-  pinMode(D8, INPUT); //  Ultrasonic Echo
+
   
     
   attachInterrupt(D5, lencode, RISING); // Setup Interrupt 
@@ -236,7 +215,6 @@ void loop() {
   leftenc.publish( &int_msg );
   int_msg.data = rmc;
   rightenc.publish( &int_msg );
-  range.publish( &int_msg );
   nh.spinOnce();
   
   delay(200);

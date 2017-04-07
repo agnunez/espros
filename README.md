@@ -48,6 +48,13 @@ ROS subscription can be used, to rotate a Steering Wheel, or other usages. See l
 
 $ rostopic pub -1 /car/angle std_msgs/Int16 80  // to adjust to Servo center angle (min:0, max:255)
 
+CarEspRosServo
+
+This version accumulate previous functionality plus provides a range distance measurement in centimeters
+on the orientation given by servo angle. Range topic can be received with:
+
+$ rostopic echo /car/range
+
 This code is part of a much larger project to build an open source ROS Robot, called Gara
 
 Have fun,

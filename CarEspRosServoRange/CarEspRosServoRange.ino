@@ -1,7 +1,7 @@
 ////////////////////////////////
 //
 // Wifi ROS Car with ESP8266 and
-// utlrosonic range servo
+// ultrasonic range servo
 //
 // Find last versions at:
 // https://github.com/agnunez/espros.git
@@ -17,8 +17,9 @@
 #include <Servo.h>
 
 #define DEBUG 1
-#define TRIGGER D9  // ultrasonic trigger pin
-#define ECHO    D8  // ultrasonic echo pin
+#define TRIGGER D8  // ultrasonic trigger pin
+#define ECHO    D0  // ultrasonic echo pin  
+                    //(!!Note: use 5v Vcc on ultrasonic board & a 2k,1k divider for ECHO GPIO protection)
 
 int spd=800;
 int lpwm=spd;
@@ -41,7 +42,7 @@ int rtp=0;
 const char* ssid = "***";
 const char* password = "***";
 
-IPAddress server(192, 168, 1, 100);
+IPAddress server(192, 168, 1, 100); // your ROS server IP here
 IPAddress ip_address;
 int status = WL_IDLE_STATUS;
 
@@ -190,8 +191,8 @@ int srange(){
   duration = pulseIn(ECHO, HIGH);
   distance = (duration/2) / 29.1;
   if(DEBUG){
-    Serial.print(distance);
-    Serial.println("Centimeter:");
+    Serial.println("cm: ");
+    Serial.println(distance);
   }
   return (int) distance;
 }
@@ -217,9 +218,8 @@ void setup() {
   pinMode(D5, INPUT); //  Left encoder
   pinMode(D6, INPUT); //  Right encoder
   s.attach(D7);       //  Servo PWM
-  pinMode(D8, INPUT); //  Ultrasonic Echo
-  pinMode(D9, OUTPUT); // Ultrasonic Trigger
-  
+  pinMode(ECHO, INPUT); //  Ultrasonic Echo. D0 with 1k,2k voltage divisor
+  pinMode(TRIGGER, OUTPUT); // Ultrasonic Trigger. D8 . Power Ultrasonic board with 5v.
     
   attachInterrupt(D5, lencode, RISING); // Setup Interrupt 
   attachInterrupt(D6, rencode, RISING); // Setup Interrupt 
