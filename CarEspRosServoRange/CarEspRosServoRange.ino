@@ -16,8 +16,8 @@
 #include <std_msgs/Float64.h>
 #include <Servo.h>
 
-#define DEBUG 0
-#define TRIGGER D0  // ultrasonic trigger pin
+#define DEBUG 1
+#define TRIGGER D9  // ultrasonic trigger pin
 #define ECHO    D8  // ultrasonic echo pin
 
 int spd=800;
@@ -193,6 +193,7 @@ int srange(){
     Serial.print(distance);
     Serial.println("Centimeter:");
   }
+  return (int) distance;
 }
 void setup() {
   if(DEBUG)Serial.begin(115200);
@@ -217,6 +218,7 @@ void setup() {
   pinMode(D6, INPUT); //  Right encoder
   s.attach(D7);       //  Servo PWM
   pinMode(D8, INPUT); //  Ultrasonic Echo
+  pinMode(D9, OUTPUT); // Ultrasonic Trigger
   
     
   attachInterrupt(D5, lencode, RISING); // Setup Interrupt 
@@ -232,11 +234,12 @@ void setup() {
 }
 
 void loop() {
+  int_msg.data = srange();
+  range.publish( &int_msg );
   int_msg.data = lmc;
   leftenc.publish( &int_msg );
   int_msg.data = rmc;
   rightenc.publish( &int_msg );
-  range.publish( &int_msg );
   nh.spinOnce();
   
   delay(200);
