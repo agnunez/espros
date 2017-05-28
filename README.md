@@ -55,6 +55,15 @@ on the orientation given by servo angle. Range topic can be received with:
 
 $ rostopic echo /car/range
 
+EspOdom
+
+This is a preliminary version with Odometry and tf support. Be careful that rosserial includes need
+an update of ArduinoHardware.h, ESP8266Hardware.h and ros.h files. Check that your distro have them
+or copy the ones included here to avoid typedef errors. With this EspOdom version, you can already
+test rviz by running
+
+$ rosrun rviz rviz
+
 This code is part of a much larger project to build an open source ROS Robot, called Gara
 
 Have fun,
