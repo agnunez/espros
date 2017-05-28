@@ -40,54 +40,23 @@ int lv=0; // left motor actual speed
 int rv=0; // measured in n tics/timer period
 int ltp=0; // left motor target position 
 int rtp=0;
-/*
+
 //////////////////////
 // WiFi Definitions //
 //////////////////////
 const char* ssid = "Home";
 const char* password = "!28081958AGUSTINNUNEZ!";
-
+/* 
+ *  Configure connection Arduino/libraries/ros_lib/ArduinoHardware.h
 IPAddress server(192, 168, 1, 100); // your ROS server IP here
 IPAddress ip_address;
 int status = WL_IDLE_STATUS;
-
 WiFiClient client;
 */
 Servo s;
 int i;
-/*
-class ArduinoHardware {
 
-  public:
-  ArduinoHardware() {};
-
-  void init() {
-    // do your initialization here. this probably includes TCP server/client setup
-    client.connect(server, 11411);
-  }
-
-  // read a byte from the serial port. -1 = failure
-  int read() {
-    // implement this method so that it reads a byte from the TCP connection and returns it
-    //  you may return -1 is there is an error; for example if the TCP connection is not open
-    return client.read();         //will return -1 when it will works
-  }
-
-  // write data to the connection to ROS
-  void write(uint8_t* data, int length) {
-    // implement this so that it takes the arguments and writes or prints them to the TCP connection
-    for(int i=0; i<length; i++)
-      client.write(data[i]);
-  }
-
-  // returns milliseconds since start of program
-  unsigned long time() {
-     return millis(); // easy; did this one for you
-  }
-};
-*/
-void stop(void)      // Stop both motors
-{
+void stop(void){      // Stop both motors
     analogWrite(D1, 0);
     analogWrite(D2, 0);
 }
