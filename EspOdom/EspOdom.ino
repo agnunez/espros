@@ -40,21 +40,44 @@ int lv=0; // left motor actual speed
 int rv=0; // measured in n tics/timer period
 int ltp=0; // left motor target position 
 int rtp=0;
-
-//////////////////////
-// WiFi Definitions //
-//////////////////////
-const char* ssid = "Home";
-const char* password = "!28081958AGUSTINNUNEZ!";
-/* 
- *  Configure connection Arduino/libraries/ros_lib/ArduinoHardware.h
-IPAddress server(192, 168, 1, 100); // your ROS server IP here
-IPAddress ip_address;
-int status = WL_IDLE_STATUS;
-WiFiClient client;
-*/
 Servo s;
 int i;
+
+//   WiFi configuration //
+const char* ssid = "Home";
+const char* password = "!28081958AGUSTINNUNEZ!";
+// Set the rosserial socket server IP address
+IPAddress server(192,168,1,100);
+// Set the rosserial socket server port
+const uint16_t serverPort = 11411;
+
+// ROS nodes //
+ros::NodeHandle nh;
+
+geometry_msgs::TransformStamped t;
+nav_msgs::Odometry odom_pub;
+tf::TransformBroadcaster broadcaster;
+
+// Functions definitions //
+
+void setupWiFi() { /// connect to ROS server WiFi as a client
+  // Use ESP8266 serial to monitor the process
+  Serial.begin(115200);
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+
+  // Connect the ESP8266 the the wifi AP
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+}
 
 void stop(void){      // Stop both motors
     analogWrite(D1, 0);
@@ -115,58 +138,7 @@ void angleCallback(const std_msgs::Int16& msg) {
   i = abs(msg.data);
   s.write(i);
 }
-
-/// ROS topics object definitions PUBLISHERS
-std_msgs::String str_msg;
-std_msgs::Int16 int_msg;
-ros::Publisher leftenc("/car/lencoder", &int_msg);
-ros::Publisher rightenc("/car/rencoder", &int_msg);
-ros::Publisher range("/car/range", &int_msg);
-
-
-// ROS SUBSCRIBERS
-ros::Subscriber<std_msgs::Int16> sub_f("/car/forward", &forwardCallback);
-ros::Subscriber<std_msgs::Int16> sub_b("/car/backward", &backwardCallback);
-ros::Subscriber<std_msgs::Int16> sub_l("/car/left", &leftCallback);
-ros::Subscriber<std_msgs::Int16> sub_r("/car/right", &rightCallback);
-ros::Subscriber<std_msgs::Int16> sub("/car/angle", &angleCallback);
-//ros::NodeHandle_<WiFiHardware> nh;
-
-ros::NodeHandle nh;
-geometry_msgs::TransformStamped t;
-//nav_msgs::Odometry odom_pub;
-tf::TransformBroadcaster broadcaster;
-
-double x = 1.0;
-double y = 0.0;
-double theta = 1.57;
-char base_link[] = "/base_link";
-char odom[] = "/odom";
-
-/// connect to ROS server WiFi as a client
-void setupWiFi() {
-  WiFi.begin(ssid, password);
-  if(DEBUG) {
-    Serial.print("\nConnecting to "); 
-    Serial.println(ssid);
-  }
-  uint8_t i = 0;
-  while (WiFi.status() != WL_CONNECTED && i++ < 20) delay(500);
-  if(i == 21){
-    if(DEBUG){
-      Serial.print("Could not connect to: "); 
-      Serial.println(ssid);
-    }
-    while(1) delay(500);
-  }
-  if(DEBUG){
-    Serial.print("Ready to use ");
-    Serial.println(WiFi.localIP());
-  }
-  
-}
-
-int srange(){
+int srange(){  // calculate distance from ultrasonic sensor
   long duration, distance;
   digitalWrite(TRIGGER, LOW);  
   delayMicroseconds(2); 
@@ -180,10 +152,31 @@ int srange(){
   return (int) distance;
 }
 
+/// ROS topics object definitions PUBLISHERS
+std_msgs::String str_msg;
+std_msgs::Int16 int_msg;
+ros::Publisher leftenc("/car/lencoder", &int_msg);
+ros::Publisher rightenc("/car/rencoder", &int_msg);
+ros::Publisher range("/car/range", &int_msg);
+
+// ROS SUBSCRIBERS
+ros::Subscriber<std_msgs::Int16> sub_f("/car/forward", &forwardCallback);
+ros::Subscriber<std_msgs::Int16> sub_b("/car/backward", &backwardCallback);
+ros::Subscriber<std_msgs::Int16> sub_l("/car/left", &leftCallback);
+ros::Subscriber<std_msgs::Int16> sub_r("/car/right", &rightCallback);
+ros::Subscriber<std_msgs::Int16> sub_a("/car/angle", &angleCallback);
+
+double x = 1.0;
+double y = 0.0;
+double theta = 1.57;
+char base_link[] = "/base_link";
+char odom[] = "/odom";
+
 void setup() {
   if(DEBUG)Serial.begin(115200);
   setupWiFi();
   delay(2000);
+  nh.getHardware()->setConnection(server, serverPort);
   nh.initNode();
   broadcaster.init(nh);
   nh.advertise(leftenc);
@@ -193,7 +186,7 @@ void setup() {
   nh.subscribe(sub_l);
   nh.subscribe(sub_f);
   nh.subscribe(sub_b);
-  nh.subscribe(sub);
+  nh.subscribe(sub_a);
 
   pinMode(D0, OUTPUT); // Ultrasonic Trigger
   pinMode(D1, OUTPUT); // 1,2EN aka D1 pwm left
@@ -217,32 +210,56 @@ void setup() {
   timer1_enable(TIM_DIV1, TIM_EDGE, TIM_LOOP);
   timer1_write(8000000);
 }
+// odometry configuration
+ros::Time current_time = nh.now();
+ros::Time last_time = current_time;
+double DistancePerCount = (2 * 3.14159265 * 0.035) / 20;   // 2*PI*R/CPR
+double lengthBetweenTwoWheels = 0.13;
 
 void loop() {
-  double dx = 0.2;
-  double dtheta = 0.18;
-  //theta=(lmc-rmc)*3.14/45.;
-  x += cos(theta)*dx*0.1;
-  y += sin(theta)*dx*0.1;
-  theta += dtheta*0.1;
-  if(theta > 3.14)
-    theta=-3.14;
-  t.header.frame_id = odom;
-  t.child_frame_id = base_link;
-  t.transform.translation.x = x; 
-  t.transform.translation.y = y; 
-  t.transform.rotation = tf::createQuaternionFromYaw(theta);
-  t.header.stamp = nh.now();
-  broadcaster.sendTransform(t);
- 
-  int_msg.data = srange();
-  range.publish( &int_msg );
-  int_msg.data = lmc;
-  leftenc.publish( &int_msg );
-  int_msg.data = rmc;
-  rightenc.publish( &int_msg );
- 
+  if (nh.connected()) {
+    current_time = nh.now();
+    double dt = current_time.toSec() - last_time.toSec();  
+    double v_left = lv*DistancePerCount / dt;   // left wheel linear velocity
+    double v_right = rv*DistancePerCount / dt;  // right wheel linear velocity
+    double vx = ((v_right + v_left) / 2) * 10;
+    double vy = 0;
+    double vth = ((v_right - v_left)/ lengthBetweenTwoWheels);
+    double th = (lmc - rmc) / 45. * 3.14159265;
+    //compute odometry in a typical way given the velocities of the robot
+    double delta_x = (vx * cos(th) - vy * sin(th)) * dt;
+    double delta_y = (vx * sin(th) + vy * cos(th)) * dt;
+    double delta_th = vth * dt; 
+    x += delta_x;
+    y += delta_y;
+    th += delta_th;
+
+    double dx = 0.2;
+    double dtheta = 0.18;
+
+    //theta=(lmc-rmc)*3.14/45.;
+    x += cos(theta)*dx*0.1;
+    y += sin(theta)*dx*0.1;
+    theta += dtheta*0.1;
+    if(theta > 3.14)
+      theta=-3.14;
+    t.header.frame_id = odom;
+    t.child_frame_id = base_link;
+    t.transform.translation.x = x; 
+    t.transform.translation.y = y; 
+    t.transform.rotation = tf::createQuaternionFromYaw(theta);
+    t.header.stamp = nh.now();
+    broadcaster.sendTransform(t);
+    int_msg.data = srange();
+    range.publish( &int_msg );
+    int_msg.data = lmc;
+    leftenc.publish( &int_msg );
+    int_msg.data = rmc;
+    rightenc.publish( &int_msg );
+  } else {
+    Serial.println("Not Connected");
+  }
   nh.spinOnce();
-  
+  // Loop exproximativly at 1Hz
   delay(200);
 }

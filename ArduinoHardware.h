@@ -54,12 +54,13 @@
 #elif defined(USE_USBCON)
   // Arduino Leonardo USB Serial Port
   #define SERIAL_CLASS Serial_
+#elif defined(__STM32F1__) and !(defined(USE_STM32_HW_SERIAL))
+  // Stm32duino Maple mini USB Serial Port
+  #define SERIAL_CLASS USBSerial
 #else 
   #include <HardwareSerial.h>  // Arduino AVR
   #define SERIAL_CLASS HardwareSerial
 #endif
-
-#ifndef ESP_H
 
 class ArduinoHardware {
   public:
@@ -72,7 +73,7 @@ class ArduinoHardware {
 #if defined(USBCON) and !(defined(USE_USBCON))
       /* Leonardo support */
       iostream = &Serial1;
-#elif defined(USE_TEENSY_HW_SERIAL)
+#elif defined(USE_TEENSY_HW_SERIAL) or defined(USE_STM32_HW_SERIAL)
       iostream = &Serial1;
 #else
       iostream = &Serial;
@@ -110,46 +111,5 @@ class ArduinoHardware {
     SERIAL_CLASS* iostream;
     long baud_;
 };
-
-#else
-
-#include <ESP8266WiFi.h>
-IPAddress server(192, 168, 1, 100); // your ROS server IP here
-IPAddress ip_address;
-int status = WL_IDLE_STATUS;
-
-WiFiClient client;
-
-class ArduinoHardware {
-
-  public:
-  ArduinoHardware() {};
-
-  void init() {
-    // do your initialization here. this probably includes TCP server/client setup
-    client.connect(server, 11411);
-  }
-
-  // read a byte from the serial port. -1 = failure
-  int read() {
-    // implement this method so that it reads a byte from the TCP connection and returns it
-    //  you may return -1 is there is an error; for example if the TCP connection is not open
-    return client.read();         //will return -1 when it will works
-  }
-
-  // write data to the connection to ROS
-  void write(uint8_t* data, int length) {
-    // implement this so that it takes the arguments and writes or prints them to the TCP connection
-    for(int i=0; i<length; i++)
-      client.write(data[i]);
-  }
-
-  // returns milliseconds since start of program
-  unsigned long time() {
-     return millis(); // easy; did this one for you
-  }
-};
-
-#endif
 
 #endif
