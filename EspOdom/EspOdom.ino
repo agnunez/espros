@@ -44,10 +44,10 @@ Servo s;
 int i;
 
 // WiFi configuration. Replace *** by your data//
-const char* ssid = "***";
-const char* password = "**";
+const char* ssid = "Home";
+const char* password = "!28081958AGUSTINNUNEZ!";
 // Set the rosserial socket server IP address
-IPAddress server(192,168,1,***);
+IPAddress server(192,168,1,100);
 // Set the rosserial socket server port
 const uint16_t serverPort = 11411;
 
@@ -168,7 +168,7 @@ ros::Subscriber<std_msgs::Int16> sub_a("/car/angle", &angleCallback);
 
 double x = 1.0;
 double y = 0.0;
-double theta = 1.57;
+double th = 0;
 char base_link[] = "/base_link";
 char odom[] = "/odom";
 
@@ -215,39 +215,37 @@ ros::Time current_time = nh.now();
 ros::Time last_time = current_time;
 double DistancePerCount = (2 * 3.14159265 * 0.035) / 20;   // 2*PI*R/CPR
 double lengthBetweenTwoWheels = 0.13;
+int last_lmc = lmc;
+int last_rmc = rmc;
+int current_lmc = lmc;
+int current_rmc = rmc;
 
 void loop() {
   if (nh.connected()) {
     current_time = nh.now();
+    current_lmc = lmc;
+    current_rmc = rmc;
     double dt = current_time.toSec() - last_time.toSec();  
-    double v_left = lv*DistancePerCount / dt;   // left wheel linear velocity
-    double v_right = rv*DistancePerCount / dt;  // right wheel linear velocity
-    double vx = ((v_right + v_left) / 2) * 10;
+    double ld = (current_lmc-last_lmc)*DistancePerCount;   // left wheel linear distance
+    double rd = (current_rmc-last_rmc)*DistancePerCount;  // right wheel linear distance
+    double vlm = ld / dt;   // left wheel linear velocity
+    double vrm = rd / dt;  // right wheel linear velocity
+    double vx = (ld + rd) / 2.;
     double vy = 0;
-    double vth = ((v_right - v_left)/ lengthBetweenTwoWheels);
-    double th = (lmc - rmc) / 45. * 3.14159265;
+    double th = (current_rmc - current_lmc) / 45. * 3.14159265;
+    last_lmc = current_lmc;
+    last_rmc = current_rmc;
+    last_time = current_time;
     //compute odometry in a typical way given the velocities of the robot
     double delta_x = (vx * cos(th) - vy * sin(th)) * dt;
     double delta_y = (vx * sin(th) + vy * cos(th)) * dt;
-    double delta_th = vth * dt; 
     x += delta_x;
     y += delta_y;
-    th += delta_th;
-
-    double dx = 0.2;
-    double dtheta = 0.18;
-
-    //theta=(lmc-rmc)*3.14/45.;
-    x += cos(theta)*dx*0.1;
-    y += sin(theta)*dx*0.1;
-    theta += dtheta*0.1;
-    if(theta > 3.14)
-      theta=-3.14;
     t.header.frame_id = odom;
     t.child_frame_id = base_link;
     t.transform.translation.x = x; 
     t.transform.translation.y = y; 
-    t.transform.rotation = tf::createQuaternionFromYaw(theta);
+    t.transform.rotation = tf::createQuaternionFromYaw(th);
     t.header.stamp = nh.now();
     broadcaster.sendTransform(t);
     int_msg.data = srange();
