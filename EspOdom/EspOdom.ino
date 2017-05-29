@@ -45,7 +45,7 @@ int i;
 
 // WiFi configuration. Replace *** by your data//
 const char* ssid = "***";
-const char* password = "***";
+const char* password = "**";
 // Set the rosserial socket server IP address
 IPAddress server(192,168,1,***);
 // Set the rosserial socket server port
