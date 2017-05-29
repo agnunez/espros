@@ -43,11 +43,11 @@ int rtp=0;
 Servo s;
 int i;
 
-//   WiFi configuration //
-const char* ssid = "Home";
-const char* password = "!28081958AGUSTINNUNEZ!";
+// WiFi configuration. Replace *** by your data//
+const char* ssid = "***";
+const char* password = "***";
 // Set the rosserial socket server IP address
-IPAddress server(192,168,1,100);
+IPAddress server(192,168,1,***);
 // Set the rosserial socket server port
 const uint16_t serverPort = 11411;
 
