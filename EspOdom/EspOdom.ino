@@ -22,59 +22,56 @@
 #include <sensor_msgs/Range.h>
 #include <Servo.h>
 
+// Init constants and global variables
+
 #define DEBUG 1
 #define TRIGGER D8  // ultrasonic trigger pin
 #define ECHO    D0  // ultrasonic echo pin  
                     //(!!Note: use 5v Vcc on ultrasonic board & a 2k,1k divider for ECHO GPIO protection)
-
 int spd=800;
 int lpwm=spd;
 int rpwm=spd;
-int len=300; // period in ms
-int lmc=0;   // left motor counter
-int rmc=0;   // right motor counter
-int lmc0=0; // last encoder value 
+int len=300;    // period in ms
+int lmc=0;      // left motor counter
+int rmc=0;   
+int lmc0=0;     // last encoder value 
 int rmc0=0;
-int ldir=1;  // left motor direction
+int ldir=1;     // left motor direction
 int rdir=1;
-int lv=0; // left motor actual speed
-int rv=0; // measured in n tics/timer period
-int ltp=0; // left motor target position 
+int lv=0;       // left motor actual speed
+int rv=0;       // measured in n tics/timer period
+int ltp=0;      // left motor target position 
 int rtp=0;
 Servo s;
-int sa=80; // Servo center position
-int sd=1;  // Servo step
-int smax=120; // Servo max angle
-int smin=40;  // Servo min Angle
-int sr=0;     // counter for 
-int sp=10;    // number of loops among range measurements
+int sa=80;      // Servo center position
+int sd=6;       // Servo position steps during swaping
+int smax=140;   // Servo max angle
+int smin=20;    // Servo min Angle
+int sr=0;       // counter for... 
+int sp=10;      // number of loops among range measurements
 
-// WiFi configuration. Replace *** by your data//
+// WiFi configuration. Replace '***' with your data
 const char* ssid = "***";
 const char* password = "***";
-// Set the rosserial socket server IP address
-IPAddress server(192,168,1,***);
-// Set the rosserial socket server port
-const uint16_t serverPort = 11411;
+IPAddress server(192.168.1.***);      // Set the rosserial socket server IP address
+const uint16_t serverPort = 11411;    // Set the rosserial socket server port
+
 
 // ROS nodes //
 ros::NodeHandle nh;
-geometry_msgs::TransformStamped t;
-geometry_msgs::TransformStamped t2;
-tf::TransformBroadcaster broadcaster;
-nav_msgs::Odometry odom_pub;
-sensor_msgs::Range range_msg;
+geometry_msgs::TransformStamped t;    // transformation frame for base toodom
+geometry_msgs::TransformStamped t2;   // transformation frame for ultrasonic to base
+tf::TransformBroadcaster broadcaster; 
+nav_msgs::Odometry odom_pub;          // Odometry message
+sensor_msgs::Range range_msg;         // Ultrasonic Range message
 
 // Functions definitions //
 
-void setupWiFi() { /// connect to ROS server WiFi as a client
-  // Use ESP8266 serial to monitor the process
-  Serial.begin(115200);
+void setupWiFi() {                    // connect to ROS server as as a client
+  Serial.begin(115200);               // Use ESP8266 serial only for to monitor the process
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
-
-  // Connect the ESP8266 the the wifi AP
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -91,7 +88,7 @@ void stop(void){      // Stop both motors
     analogWrite(D2, 0);
 }
  
-void motion(int lpw, int rpw, int llevel, int rlevel, int steps) {  // generic motion with "steps" duration in milisecods
+void motion(int lpw, int rpw, int llevel, int rlevel, int period) {  // generic motion for a period in milisecods
     if (llevel==HIGH) {
       ldir=1; 
     } else {
@@ -106,26 +103,22 @@ void motion(int lpw, int rpw, int llevel, int rlevel, int steps) {  // generic m
     analogWrite(D2, rpw);
     digitalWrite(D3, llevel);
     digitalWrite(D4, rlevel);
-    delay(steps);
+    delay(period);
     stop();
 }
-//// GPIO ISR Interrupt service routines for encoder changes
-void lencode() {
+void lencode() {          // GPIO ISR Interrupt service routines for encoder changes
   lmc=lmc+ldir;
 }
 void rencode(){ 
   rmc=rmc+rdir;
 }
-//// Speed (lv,rv) calculation every timer tic
-void tic(void){ 
-  lv=lmc-lmc0;   // lv left instant velocity
+void tic(void){           // timer tics for continuous velocity calculation
+  lv=lmc-lmc0;            // lv left instant velocity
   lmc0=lmc;
-  rv=rmc-rmc0;   // rv right install velocity
+  rv=rmc-rmc0;            // rv right install velocity
   rmc0=rmc0;
 }
-
-////  All subscriber messages callbacks here
-void leftCallback(const std_msgs::Int16& msg) {
+void leftCallback(const std_msgs::Int16& msg) { //  All subscriber messages callbacks here
   len = abs(msg.data);
   motion(lpwm,rpwm,LOW,HIGH,len);
 }
@@ -142,19 +135,21 @@ void backwardCallback(const std_msgs::Int16& msg) {
   motion(lpwm,rpwm,LOW,LOW,len);
 }
 
-int sstep(){
+int sstep(){                  // servo swaping commands
   sa+=sd;
   if(sa>smax || sa<smin) sd=-sd;
   s.write(sa);
 }
-int srange(){  // calculate distance from ultrasonic sensor
+
+double radian(int serout){               // servo 80 = 0 deg, servo -80 = - 90deg, servo 160 = 90 deg
+  return (serout-80)*0.01963495408;  // angrad =(serout-80)/80 * 90 * PI / 180;
+}
+int srange(){                // calculate distance from ultrasonic sensor
   long duration, distance;
   digitalWrite(TRIGGER, LOW);  
-  delayMicroseconds(2); 
-  
+  delayMicroseconds(2);   
   digitalWrite(TRIGGER, HIGH);
   delayMicroseconds(10); 
-  
   digitalWrite(TRIGGER, LOW);
   duration = pulseIn(ECHO, HIGH);
   distance = (duration/2) / 29.1;
@@ -162,13 +157,13 @@ int srange(){  // calculate distance from ultrasonic sensor
   return (int) distance;
 }
 
-/// ROS topics object definitions PUBLISHERS
+// ROS topics object definitions PUBLISHERS
 std_msgs::String str_msg;
 std_msgs::Int16 int_msg;
 ros::Publisher leftenc("/car/lencoder", &int_msg);
 ros::Publisher rightenc("/car/rencoder", &int_msg);
 ros::Publisher pub_range("/ultrasound", &range_msg);
-ros::Publisher angle("/car/angle", &int_msg);
+ros::Publisher angle("/car/angle", &int_msg);      // servo angle
 
 // ROS SUBSCRIBERS
 ros::Subscriber<std_msgs::Int16> sub_f("/car/forward", &forwardCallback);
@@ -176,6 +171,7 @@ ros::Subscriber<std_msgs::Int16> sub_b("/car/backward", &backwardCallback);
 ros::Subscriber<std_msgs::Int16> sub_l("/car/left", &leftCallback);
 ros::Subscriber<std_msgs::Int16> sub_r("/car/right", &rightCallback);
 
+// ros variables
 double x = 1.0;
 double y = 0.0;
 double th = 0;
@@ -184,26 +180,28 @@ char odom[] = "/odom";
 char ultrafrid[] = "/ultrasound";
 
 void setup() {
-  if(DEBUG)Serial.begin(115200);
+  if(DEBUG) Serial.begin(115200);
   setupWiFi();
   delay(2000);
+  
   nh.getHardware()->setConnection(server, serverPort);
   nh.initNode();
   broadcaster.init(nh);
+
   nh.advertise(leftenc);
   nh.advertise(rightenc);
   nh.advertise(pub_range);
   range_msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
-  range_msg.header.frame_id =  ultrafrid;
+  range_msg.header.frame_id =  ultrafrid;   // ultrasound frame id
   range_msg.field_of_view = 0.1;
   range_msg.min_range = 0.0;
-  range_msg.max_range = 6.47;
+  range_msg.max_range = 20;
   nh.advertise(angle);
   nh.subscribe(sub_r);
   nh.subscribe(sub_l);
   nh.subscribe(sub_f);
   nh.subscribe(sub_b);
-
+// configure GPIO's
   pinMode(D0, OUTPUT); // Ultrasonic Trigger
   pinMode(D1, OUTPUT); // 1,2EN aka D1 pwm left
   pinMode(D2, OUTPUT); // 3,4EN aka D2 pwm right
@@ -214,10 +212,11 @@ void setup() {
   s.attach(D7);       //  Servo PWM
   pinMode(ECHO, INPUT); //  Ultrasonic Echo. D0 with 1k,2k voltage divisor
   pinMode(TRIGGER, OUTPUT); // Ultrasonic Trigger. D8 . Power Ultrasonic board with 5v.
-    
+// configure interrupts to their ISR's    
   attachInterrupt(D5, lencode, RISING); // Setup Interrupt 
   attachInterrupt(D6, rencode, RISING); // Setup Interrupt 
   sei();                                // Enable interrupts  
+// configure timer
   int currentTime = millis();
   int cloopTime = currentTime;
   timer1_disable();
@@ -226,10 +225,11 @@ void setup() {
   timer1_enable(TIM_DIV1, TIM_EDGE, TIM_LOOP);
   timer1_write(8000000);
 }
+
 // odometry configuration
 ros::Time current_time = nh.now();
 ros::Time last_time = current_time;
-double DistancePerCount = (2 * 3.14159265 * 0.035) / 20;   // 2*PI*R/CPR
+double DistancePerCount = (TWO_PI * 0.035) / 20;   // 2*PI*R/CPR  WHEEL ENCODER 20 CPR
 double lengthBetweenTwoWheels = 0.13;
 int last_lmc = lmc;
 int last_rmc = rmc;
@@ -244,11 +244,11 @@ void loop() {
     double dt = current_time.toSec() - last_time.toSec();  
     double ld = (current_lmc-last_lmc)*DistancePerCount;   // left wheel linear distance
     double rd = (current_rmc-last_rmc)*DistancePerCount;  // right wheel linear distance
-    double vlm = ld / dt;   // left wheel linear velocity
-    double vrm = rd / dt;  // right wheel linear velocity
-    double vx = (ld + rd) / 2.;
+    double vlm = ld / dt;                                // left wheel linear velocity
+    double vrm = rd / dt;                               // right wheel linear velocity
+    double vx = (ld + rd) / 2.;                        // base center forward velocity 
     double vy = 0;
-    double th = (current_rmc - current_lmc) / 45. * 3.14159265;
+    double th = (current_rmc - current_lmc) / 45. * PI;
     last_lmc = current_lmc;
     last_rmc = current_rmc;
     last_time = current_time;
@@ -271,8 +271,7 @@ void loop() {
     t2.transform.translation.x = 0.05; 
     t2.transform.translation.y = 0.0; 
     t2.transform.translation.z = 0.1;
-    double saangle = (sa-80)*0.0314159265;
-    t2.transform.rotation = tf::createQuaternionFromYaw(saangle);
+    t2.transform.rotation = tf::createQuaternionFromYaw(radian(sa));
     t2.header.stamp = current_time;
     broadcaster.sendTransform(t2);
     int_msg.data = sa;
