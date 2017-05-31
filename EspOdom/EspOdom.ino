@@ -41,13 +41,18 @@ int rv=0; // measured in n tics/timer period
 int ltp=0; // left motor target position 
 int rtp=0;
 Servo s;
-int i;
+int sa=80; // Servo center position
+int sd=1; 
+int smax=110; // Servo max angle
+int smin=50;  // Servo min Angle
+int sr=0;     // counter for 
+int sp=10;    // number of loops among range measurements
 
 // WiFi configuration. Replace *** by your data//
-const char* ssid = "Home";
-const char* password = "!28081958AGUSTINNUNEZ!";
+const char* ssid = "***";
+const char* password = "***";
 // Set the rosserial socket server IP address
-IPAddress server(192,168,1,100);
+IPAddress server(192,168,1,***);
 // Set the rosserial socket server port
 const uint16_t serverPort = 11411;
 
@@ -134,9 +139,11 @@ void backwardCallback(const std_msgs::Int16& msg) {
   len = abs(msg.data);
   motion(lpwm,rpwm,LOW,LOW,len);
 }
-void angleCallback(const std_msgs::Int16& msg) {
-  i = abs(msg.data);
-  s.write(i);
+
+int sstep(){
+  sa+=sd;
+  if(sa>smax || sa<smin) sd=-sd;
+  s.write(sa);
 }
 int srange(){  // calculate distance from ultrasonic sensor
   long duration, distance;
@@ -149,6 +156,7 @@ int srange(){  // calculate distance from ultrasonic sensor
   digitalWrite(TRIGGER, LOW);
   duration = pulseIn(ECHO, HIGH);
   distance = (duration/2) / 29.1;
+  sstep();
   return (int) distance;
 }
 
@@ -158,13 +166,13 @@ std_msgs::Int16 int_msg;
 ros::Publisher leftenc("/car/lencoder", &int_msg);
 ros::Publisher rightenc("/car/rencoder", &int_msg);
 ros::Publisher range("/car/range", &int_msg);
+ros::Publisher angle("/car/angle", &int_msg);
 
 // ROS SUBSCRIBERS
 ros::Subscriber<std_msgs::Int16> sub_f("/car/forward", &forwardCallback);
 ros::Subscriber<std_msgs::Int16> sub_b("/car/backward", &backwardCallback);
 ros::Subscriber<std_msgs::Int16> sub_l("/car/left", &leftCallback);
 ros::Subscriber<std_msgs::Int16> sub_r("/car/right", &rightCallback);
-ros::Subscriber<std_msgs::Int16> sub_a("/car/angle", &angleCallback);
 
 double x = 1.0;
 double y = 0.0;
@@ -182,11 +190,11 @@ void setup() {
   nh.advertise(leftenc);
   nh.advertise(rightenc);
   nh.advertise(range);
+  nh.advertise(angle);
   nh.subscribe(sub_r);
   nh.subscribe(sub_l);
   nh.subscribe(sub_f);
   nh.subscribe(sub_b);
-  nh.subscribe(sub_a);
 
   pinMode(D0, OUTPUT); // Ultrasonic Trigger
   pinMode(D1, OUTPUT); // 1,2EN aka D1 pwm left
@@ -250,6 +258,8 @@ void loop() {
     broadcaster.sendTransform(t);
     int_msg.data = srange();
     range.publish( &int_msg );
+    int_msg.data = sa;
+    angle.publish( &int_msg );
     int_msg.data = lmc;
     leftenc.publish( &int_msg );
     int_msg.data = rmc;
