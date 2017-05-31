@@ -19,6 +19,7 @@
 #include <tf/transform_broadcaster.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
+#include <sensor_msgs/Range.h>
 #include <Servo.h>
 
 #define DEBUG 1
@@ -42,9 +43,9 @@ int ltp=0; // left motor target position
 int rtp=0;
 Servo s;
 int sa=80; // Servo center position
-int sd=1; 
-int smax=110; // Servo max angle
-int smin=50;  // Servo min Angle
+int sd=1;  // Servo step
+int smax=120; // Servo max angle
+int smin=40;  // Servo min Angle
 int sr=0;     // counter for 
 int sp=10;    // number of loops among range measurements
 
@@ -58,10 +59,11 @@ const uint16_t serverPort = 11411;
 
 // ROS nodes //
 ros::NodeHandle nh;
-
 geometry_msgs::TransformStamped t;
-nav_msgs::Odometry odom_pub;
+geometry_msgs::TransformStamped t2;
 tf::TransformBroadcaster broadcaster;
+nav_msgs::Odometry odom_pub;
+sensor_msgs::Range range_msg;
 
 // Functions definitions //
 
@@ -165,7 +167,7 @@ std_msgs::String str_msg;
 std_msgs::Int16 int_msg;
 ros::Publisher leftenc("/car/lencoder", &int_msg);
 ros::Publisher rightenc("/car/rencoder", &int_msg);
-ros::Publisher range("/car/range", &int_msg);
+ros::Publisher pub_range("/ultrasound", &range_msg);
 ros::Publisher angle("/car/angle", &int_msg);
 
 // ROS SUBSCRIBERS
@@ -179,6 +181,7 @@ double y = 0.0;
 double th = 0;
 char base_link[] = "/base_link";
 char odom[] = "/odom";
+char ultrafrid[] = "/ultrasound";
 
 void setup() {
   if(DEBUG)Serial.begin(115200);
@@ -189,7 +192,12 @@ void setup() {
   broadcaster.init(nh);
   nh.advertise(leftenc);
   nh.advertise(rightenc);
-  nh.advertise(range);
+  nh.advertise(pub_range);
+  range_msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
+  range_msg.header.frame_id =  ultrafrid;
+  range_msg.field_of_view = 0.1;
+  range_msg.min_range = 0.0;
+  range_msg.max_range = 6.47;
   nh.advertise(angle);
   nh.subscribe(sub_r);
   nh.subscribe(sub_l);
@@ -244,7 +252,6 @@ void loop() {
     last_lmc = current_lmc;
     last_rmc = current_rmc;
     last_time = current_time;
-    //compute odometry in a typical way given the velocities of the robot
     double delta_x = (vx * cos(th) - vy * sin(th)) * dt;
     double delta_y = (vx * sin(th) + vy * cos(th)) * dt;
     x += delta_x;
@@ -256,8 +263,18 @@ void loop() {
     t.transform.rotation = tf::createQuaternionFromYaw(th);
     t.header.stamp = nh.now();
     broadcaster.sendTransform(t);
-    int_msg.data = srange();
-    range.publish( &int_msg );
+    range_msg.range = srange()/100.;
+    range_msg.header.stamp = current_time;
+    pub_range.publish(&range_msg);
+    t2.header.frame_id = base_link;
+    t2.child_frame_id = ultrafrid;
+    t2.transform.translation.x = 0.05; 
+    t2.transform.translation.y = 0.0; 
+    t2.transform.translation.z = 0.1;
+    double saangle = (sa-80)*0.0314159265;
+    t2.transform.rotation = tf::createQuaternionFromYaw(saangle);
+    t2.header.stamp = current_time;
+    broadcaster.sendTransform(t2);
     int_msg.data = sa;
     angle.publish( &int_msg );
     int_msg.data = lmc;
