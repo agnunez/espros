@@ -51,9 +51,9 @@ int sr=0;       // counter for...
 int sp=10;      // number of loops among range measurements
 
 // WiFi configuration. Replace '***' with your data
-const char* ssid = "***";
-const char* password = "***";
-IPAddress server(192.168.1.***);      // Set the rosserial socket server IP address
+const char* ssid = "GTC-Guest";
+const char* password = ".gtcguest.";
+IPAddress server(161,72,94,217);      // Set the rosserial socket server IP address
 const uint16_t serverPort = 11411;    // Set the rosserial socket server port
 
 
@@ -261,7 +261,7 @@ void loop() {
     t.transform.translation.x = x; 
     t.transform.translation.y = y; 
     t.transform.rotation = tf::createQuaternionFromYaw(th);
-    t.header.stamp = nh.now();
+    t.header.stamp = current_time;
     broadcaster.sendTransform(t);
     range_msg.range = srange()/100.;
     range_msg.header.stamp = current_time;
