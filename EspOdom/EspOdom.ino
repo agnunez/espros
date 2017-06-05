@@ -59,10 +59,11 @@ const uint16_t serverPort = 11411;    // Set the rosserial socket server port
 
 // ROS nodes //
 ros::NodeHandle nh;
-geometry_msgs::TransformStamped t;    // transformation frame for base toodom
+geometry_msgs::TransformStamped t;    // transformation frame for base 
 geometry_msgs::TransformStamped t2;   // transformation frame for ultrasonic to base
-tf::TransformBroadcaster broadcaster; 
-nav_msgs::Odometry odom_pub;          // Odometry message
+tf::TransformBroadcaster broadcaster;
+nav_msgs::Odometry odom;              // Odometry message
+//tf::TransformBroadcaster odom_broadcaster;
 sensor_msgs::Range range_msg;         // Ultrasonic Range message
 
 // Functions definitions //
@@ -160,10 +161,13 @@ int srange(){                // calculate distance from ultrasonic sensor
 // ROS topics object definitions PUBLISHERS
 std_msgs::String str_msg;
 std_msgs::Int16 int_msg;
+/*
 ros::Publisher leftenc("/car/lencoder", &int_msg);
 ros::Publisher rightenc("/car/rencoder", &int_msg);
-ros::Publisher pub_range("/ultrasound", &range_msg);
 ros::Publisher angle("/car/angle", &int_msg);      // servo angle
+*/
+ros::Publisher pub_range("/ultrasound", &range_msg);
+ros::Publisher odom_pub("/odom", &odom); 
 
 // ROS SUBSCRIBERS
 ros::Subscriber<std_msgs::Int16> sub_f("/car/forward", &forwardCallback);
@@ -176,7 +180,7 @@ double x = 1.0;
 double y = 0.0;
 double th = 0;
 char base_link[] = "/base_link";
-char odom[] = "/odom";
+char odomid[] = "/odom";
 char ultrafrid[] = "/ultrasound";
 
 void setup() {
@@ -187,16 +191,18 @@ void setup() {
   nh.getHardware()->setConnection(server, serverPort);
   nh.initNode();
   broadcaster.init(nh);
-
+/*
   nh.advertise(leftenc);
   nh.advertise(rightenc);
+*/
   nh.advertise(pub_range);
+  nh.advertise(odom_pub);
+//  nh.advertise(angle);
   range_msg.radiation_type = sensor_msgs::Range::ULTRASOUND;
   range_msg.header.frame_id =  ultrafrid;   // ultrasound frame id
   range_msg.field_of_view = 0.1;
   range_msg.min_range = 0.0;
   range_msg.max_range = 20;
-  nh.advertise(angle);
   nh.subscribe(sub_r);
   nh.subscribe(sub_l);
   nh.subscribe(sub_f);
@@ -249,6 +255,7 @@ void loop() {
     double vx = (ld + rd) / 2.;                        // base center forward velocity 
     double vy = 0;
     double th = (current_rmc - current_lmc) / 45. * PI;
+    double vth = th / dt; 
     last_lmc = current_lmc;
     last_rmc = current_rmc;
     last_time = current_time;
@@ -256,7 +263,7 @@ void loop() {
     double delta_y = (vx * sin(th) + vy * cos(th)) * dt;
     x += delta_x;
     y += delta_y;
-    t.header.frame_id = odom;
+    t.header.frame_id = odomid;
     t.child_frame_id = base_link;
     t.transform.translation.x = x; 
     t.transform.translation.y = y; 
@@ -274,12 +281,34 @@ void loop() {
     t2.transform.rotation = tf::createQuaternionFromYaw(radian(sa));
     t2.header.stamp = current_time;
     broadcaster.sendTransform(t2);
+    // odometry
+    geometry_msgs::Quaternion odom_quat = tf::createQuaternionFromYaw(th);
+    odom.header.stamp = current_time;
+    odom.header.frame_id = odomid;
+
+    //set the position
+    odom.pose.pose.position.x = x;
+    odom.pose.pose.position.y = y;
+    odom.pose.pose.position.z = 0.0;
+    odom.pose.pose.orientation = odom_quat;
+
+    //set the velocity
+    odom.child_frame_id = "base_link";
+    odom.twist.twist.linear.x = vx;
+    odom.twist.twist.linear.y = vy;
+    odom.twist.twist.angular.z = vth;
+
+    //publish the message
+    odom_pub.publish(&odom);
+/*
+    //publish rest of topics
     int_msg.data = sa;
     angle.publish( &int_msg );
     int_msg.data = lmc;
     leftenc.publish( &int_msg );
     int_msg.data = rmc;
     rightenc.publish( &int_msg );
+*/
   } else {
     Serial.println("Not Connected");
   }

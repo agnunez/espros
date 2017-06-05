@@ -19,7 +19,7 @@
 int spd=800;
 int lpwm=spd;
 int rpwm=spd;
-int len=300; // period in ms
+int len=500; // period in ms
 int lmc=0;   // left motor counter
 int rmc=0;   // right motor counter
 int lmc0=0; // last encoder value 
@@ -34,125 +34,66 @@ int rtp=0;
 //////////////////////
 // WiFi Definitions //
 //////////////////////
-const char* ssid = "***";
-const char* password = "***";
+// WiFi configuration. Replace '***' with your data
+const char* ssid = "GTC-Guest";
+const char* password = ".gtcguest.";
+IPAddress server(161,72,94,217);      // Set the rosserial socket server IP address
+const uint16_t serverPort = 11411;    // Set the rosserial socket server port
 
-IPAddress server(192, 168, 1, 100);
-IPAddress ip_address;
-int status = WL_IDLE_STATUS;
-
-WiFiClient client;
-
-class WiFiHardware {
-
-  public:
-  WiFiHardware() {};
-
-  void init() {
-    // do your initialization here. this probably includes TCP server/client setup
-    client.connect(server, 11411);
-  }
-
-  // read a byte from the serial port. -1 = failure
-  int read() {
-    // implement this method so that it reads a byte from the TCP connection and returns it
-    //  you may return -1 is there is an error; for example if the TCP connection is not open
-    return client.read();         //will return -1 when it will works
-  }
-
-  // write data to the connection to ROS
-  void write(uint8_t* data, int length) {
-    // implement this so that it takes the arguments and writes or prints them to the TCP connection
-    for(int i=0; i<length; i++)
-      client.write(data[i]);
-  }
-
-  // returns milliseconds since start of program
-  unsigned long time() {
-     return millis(); // easy; did this one for you
-  }
-};
-
-void stop(void)
-{
+void stop(void){      // Stop both motors
     analogWrite(D1, 0);
     analogWrite(D2, 0);
 }
- 
-void forward(void) {
-    analogWrite(D1, lpwm);
-    analogWrite(D2, rpwm);
-    digitalWrite(D3, HIGH);
-    digitalWrite(D4, HIGH);
-    delay(len);
+void motion(int lpw, int rpw, int llevel, int rlevel, int period) {  // generic motion for a period in milisecods
+    if (llevel==HIGH) {
+      ldir=1; 
+    } else {
+      ldir=-1;
+    }
+    if (rlevel==HIGH) {
+      rdir=1; 
+    } else {
+      rdir=-1;
+    }
+    analogWrite(D1, lpw);
+    analogWrite(D2, rpw);
+    digitalWrite(D3, llevel);
+    digitalWrite(D4, rlevel);
+    delay(period);
     stop();
 }
- 
-void backward(void) {
-    analogWrite(D1, lpwm);
-    analogWrite(D2, rpwm);
-    digitalWrite(D3, LOW);
-    digitalWrite(D4, LOW);
-    delay(len);
-    stop();
-}
- 
-void left(void) {
-    analogWrite(D1, lpwm);
-    analogWrite(D2, rpwm);
-    digitalWrite(D3, LOW);
-    digitalWrite(D4, HIGH);
-    delay(len);
-    stop();
-}
- 
-void right(void) {
-    analogWrite(D1, lpwm);
-    analogWrite(D2, rpwm);
-    digitalWrite(D3, HIGH);
-    digitalWrite(D4, LOW);
-    delay(len);
-    stop();
-}
- 
-void lencode() {
+void lencode() {          // GPIO ISR Interrupt service routines for encoder changes
   lmc=lmc+ldir;
 }
-void rencode(){
+void rencode(){ 
   rmc=rmc+rdir;
 }
-void tic(void){
-  lv=lmc-lmc0;
+void tic(void){           // timer tics for continuous velocity calculation
+  lv=lmc-lmc0;            // lv left instant velocity
   lmc0=lmc;
-  rv=rmc-rmc0;
+  rv=rmc-rmc0;            // rv right install velocity
   rmc0=rmc0;
 }
-
-void leftCallback(const std_msgs::Int16& msg) {
-  len = abs(msg.data);
-  ldir=-1;
-  rdir=1;
-  left();
+void leftCallback(const std_msgs::Int16& msg) { //  All subscriber messages callbacks here
+//  len = abs(msg.data);
+  lpwm = abs(msg.data);
+  rpwm = lpwm;
+  motion(lpwm,rpwm,LOW,HIGH,len);
 }
 void rightCallback(const std_msgs::Int16& msg) {
-  len = abs(msg.data);
-  ldir=1;
-  rdir=-1;
-  right();
+//  len = abs(msg.data);
+  lpwm = abs(msg.data);
+  motion(lpwm,rpwm,HIGH,LOW,len);
 }
-
 void forwardCallback(const std_msgs::Int16& msg) {
-  len = abs(msg.data);
-  ldir=1;
-  rdir=1;            
-  forward();
+//  len = abs(msg.data);
+  lpwm = abs(msg.data);
+  motion(lpwm,rpwm,HIGH,HIGH,len);
 }
-
 void backwardCallback(const std_msgs::Int16& msg) {
-  len = abs(msg.data);
-  ldir=-1;
-  rdir=-1;
-  backward();
+//  len = abs(msg.data);
+  lpwm = abs(msg.data);
+  motion(lpwm,rpwm,LOW,LOW,len);
 }
 
 std_msgs::String str_msg;
@@ -164,26 +105,30 @@ ros::Subscriber<std_msgs::Int16> sub_f("/car/forward", &forwardCallback);
 ros::Subscriber<std_msgs::Int16> sub_b("/car/backward", &backwardCallback);
 ros::Subscriber<std_msgs::Int16> sub_l("/car/left", &leftCallback);
 ros::Subscriber<std_msgs::Int16> sub_r("/car/right", &rightCallback);
-ros::NodeHandle_<WiFiHardware> nh;
 
-void setupWiFi()
-{
+void setupWiFi() {                    // connect to ROS server as as a client
+  Serial.begin(115200);               // Use ESP8266 serial only for to monitor the process
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
   WiFi.begin(ssid, password);
-  Serial.print("\nConnecting to "); Serial.println(ssid);
-  uint8_t i = 0;
-  while (WiFi.status() != WL_CONNECTED && i++ < 20) delay(500);
-  if(i == 21){
-    Serial.print("Could not connect to"); Serial.println(ssid);
-    while(1) delay(500);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
   }
-  Serial.print("Ready! Use ");
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 }
+
+ros::NodeHandle nh;
 
 void setup() {
   Serial.begin(115200);
   setupWiFi();
   delay(2000);
+  nh.getHardware()->setConnection(server, serverPort);
   nh.initNode();
   nh.advertise(leftenc);
   nh.advertise(rightenc);
@@ -192,16 +137,22 @@ void setup() {
   nh.subscribe(sub_f);
   nh.subscribe(sub_b);
 
+ // configure GPIO's
+  pinMode(D0, OUTPUT); // Ultrasonic Trigger
   pinMode(D1, OUTPUT); // 1,2EN aka D1 pwm left
   pinMode(D2, OUTPUT); // 3,4EN aka D2 pwm right
   pinMode(D3, OUTPUT); // 1A,2A aka D3
   pinMode(D4, OUTPUT); // 3A,4A aka D4
   pinMode(D5, INPUT); //  Left encoder
   pinMode(D6, INPUT); //  Right encoder
-    
+//  s.attach(D7);       //  Servo PWM
+//  pinMode(ECHO, INPUT); //  Ultrasonic Echo. D0 with 1k,2k voltage divisor
+//  pinMode(TRIGGER, OUTPUT); // Ultrasonic Trigger. D8 . Power Ultrasonic board with 5v.
+// configure interrupts to their ISR's    
   attachInterrupt(D5, lencode, RISING); // Setup Interrupt 
   attachInterrupt(D6, rencode, RISING); // Setup Interrupt 
   sei();                                // Enable interrupts  
+// configure timer
   int currentTime = millis();
   int cloopTime = currentTime;
   timer1_disable();
