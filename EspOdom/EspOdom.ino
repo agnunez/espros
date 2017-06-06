@@ -28,10 +28,10 @@
 #define TRIGGER D8  // ultrasonic trigger pin
 #define ECHO    D0  // ultrasonic echo pin  
                     //(!!Note: use 5v Vcc on ultrasonic board & a 2k,1k divider for ECHO GPIO protection)
-int spd=800;
+int spd=0;
 int lpwm=spd;
 int rpwm=spd;
-int len=300;    // period in ms
+int len=300;    // safety motion period before stop in ms
 int lmc=0;      // left motor counter
 int rmc=0;   
 int lmc0=0;     // last encoder value 
@@ -49,6 +49,11 @@ int smax=140;   // Servo max angle
 int smin=20;    // Servo min Angle
 int sr=0;       // counter for... 
 int sp=10;      // number of loops among range measurements
+float WheelSeparation = 0.135;
+float WheelDiameter = 0.07;
+int TPR = 20; //Encoder ticks per rotation 
+int IMax = 1023;
+int Kp = 3; //  Proportional acceleration multiplier. 
 
 // WiFi configuration. Replace '***' with your data
 const char* ssid = "GTC-Guest";
@@ -56,15 +61,6 @@ const char* password = ".gtcguest.";
 IPAddress server(161,72,124,168);      // Set the rosserial socket server IP address
 const uint16_t serverPort = 11411;    // Set the rosserial socket server port
 
-
-// ROS nodes //
-ros::NodeHandle nh;
-geometry_msgs::TransformStamped t;    // transformation frame for base 
-geometry_msgs::TransformStamped t2;   // transformation frame for ultrasonic to base
-tf::TransformBroadcaster broadcaster;
-nav_msgs::Odometry odom;              // Odometry message
-//tf::TransformBroadcaster odom_broadcaster;
-sensor_msgs::Range range_msg;         // Ultrasonic Range message
 
 // Functions definitions //
 
@@ -104,8 +100,9 @@ void motion(int lpw, int rpw, int llevel, int rlevel, int period) {  // generic 
     analogWrite(D2, rpw);
     digitalWrite(D3, llevel);
     digitalWrite(D4, rlevel);
-    delay(period);
-    stop();
+    //stop after a safety period
+    //delay(period);
+    //stop();
 }
 void lencode() {          // GPIO ISR Interrupt service routines for encoder changes
   lmc=lmc+ldir;
@@ -136,6 +133,32 @@ void backwardCallback(const std_msgs::Int16& msg) {
   motion(lpwm,rpwm,LOW,LOW,len);
 }
 
+void cmd_velCallback( const geometry_msgs::Twist& CVel){
+  //geometry_msgs::Twist twist = twist_msg;   
+    double vel_x = CVel.linear.x;
+    double vel_th = CVel.angular.z;
+    double right_vel = 0.0;
+    double left_vel = 0.0;
+
+    // turning
+    if(vel_x == 0){  
+        right_vel = vel_th * WheelSeparation / 2.0;
+        left_vel = (-1) * right_vel;
+    }
+    // forward / backward
+    else if(vel_th == 0){ 
+        left_vel = right_vel = vel_x;
+    }
+    // moving doing arcs
+    else{ 
+        left_vel = vel_x - vel_th * WheelSeparation / 2.0;
+        right_vel = vel_x + vel_th * WheelSeparation / 2.0;
+    }
+    //write new command speeds to global vars 
+    WCS[0] = left_vel;
+    WCS[1] = right_vel;
+}
+
 int sstep(){                  // servo swaping commands
   sa+=sd;
   if(sa>smax || sa<smin) sd=-sd;
@@ -158,6 +181,17 @@ int srange(){                // calculate distance from ultrasonic sensor
   return (int) distance;
 }
 
+// ROS nodes //
+ros::NodeHandle nh;
+geometry_msgs::TransformStamped t;    // transformation frame for base 
+geometry_msgs::TransformStamped t2;   // transformation frame for ultrasonic to base
+tf::TransformBroadcaster broadcaster;
+nav_msgs::Odometry odom;              // Odometry message
+geometry_msgs::Twist odom_msg;        // 
+
+//tf::TransformBroadcaster odom_broadcaster;
+sensor_msgs::Range range_msg;         // Ultrasonic Range message
+
 // ROS topics object definitions PUBLISHERS
 std_msgs::String str_msg;
 std_msgs::Int16 int_msg;
@@ -168,12 +202,14 @@ ros::Publisher angle("/car/angle", &int_msg);      // servo angle
 */
 ros::Publisher pub_range("/ultrasound", &range_msg);
 ros::Publisher odom_pub("/odom", &odom); 
+ros::Publisher Pub ("ard_odom", &odom_msg);
 
 // ROS SUBSCRIBERS
 ros::Subscriber<std_msgs::Int16> sub_f("/car/forward", &forwardCallback);
 ros::Subscriber<std_msgs::Int16> sub_b("/car/backward", &backwardCallback);
 ros::Subscriber<std_msgs::Int16> sub_l("/car/left", &leftCallback);
 ros::Subscriber<std_msgs::Int16> sub_r("/car/right", &rightCallback);
+ros::Subscriber<geometry_msgs::Twist> Sub("cmd_vel", &cmd_velCallback );
 
 // ros variables
 double x = 1.0;
