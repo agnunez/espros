@@ -53,7 +53,7 @@ int sp=10;      // number of loops among range measurements
 // WiFi configuration. Replace '***' with your data
 const char* ssid = "GTC-Guest";
 const char* password = ".gtcguest.";
-IPAddress server(161,72,94,217);      // Set the rosserial socket server IP address
+IPAddress server(161,72,124,168);      // Set the rosserial socket server IP address
 const uint16_t serverPort = 11411;    // Set the rosserial socket server port
 
 

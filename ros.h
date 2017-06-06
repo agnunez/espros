@@ -53,7 +53,7 @@ namespace ros
 
 #elif defined(ESP8266)
 
-  typedef NodeHandle_<Esp8266Hardware> NodeHandle;
+  typedef NodeHandle_<Esp8266Hardware, 25, 25, 512, 1024> NodeHandle;
 
 #else
 

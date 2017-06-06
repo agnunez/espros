@@ -17,7 +17,9 @@ int rv=0;       // measured in n tics/timer period
 int ltp=0;      // left motor target position 
 float av, th;   // average & angular velocity
 int ti=0;
-
+int gv=8;        // goal velocity
+float kpl=2;     // Kp from PID
+float kpr=2;     // Kp from PID
 
 os_timer_t myTimer;
 
@@ -27,9 +29,13 @@ void tic(void *pArg) {
   lmc0=lmc;
   rv=rmc-rmc0;            // rv right install velocity
   rmc0=rmc;
-  th=rv-lv;               // angular speed coef. (*pi()/rstep(180))
+  th=rmc-lmc;             // angular position(*pi()/rstep(180))
   av=(lv+rv)/2.;          // center forward velocity
   ti+=1;                  // tic counter 
+  if(lv>gv){ lpwm-=(lv-gv)*kpl;}
+  if(lv<gv){ lpwm+=(gv-lv)*kpl;}
+  if(rv>gv){ rpwm-=(rv-gv)*kpr;}
+  if(rv<gv){ rpwm+=(gv-rv)*kpr;}
 }
 
 void stop(void){      // Stop both motors
@@ -48,6 +54,10 @@ void motion(int lpwm, int rpwm, int llevel, int rlevel) {
     } else {
       rdir=-1;
     }
+    if(lpwm>1023) lpwm=1023;
+    if(rpwm>1023) rpwm=1023;
+    if(lpwm<0) lpwm=0;
+    if(rpwm<0) rpwm=0;
     analogWrite(D1, lpwm);
     analogWrite(D2, rpwm);
     digitalWrite(D3, llevel);
@@ -73,10 +83,9 @@ void setup() {
   sei();                                // Enable interrupts  
   int currentTime = millis();
   int cloopTime = currentTime;
-  
   os_timer_setfn(&myTimer, tic, NULL);
   os_timer_arm(&myTimer, 500, true);   // timer in ms
-
+  
   Serial.begin(115200);
   Serial.println("Ready");
 }
@@ -84,29 +93,30 @@ void setup() {
 void loop(){
   //waiting for input
   if (Serial.available() != 0) {
-    lpwm = Serial.parseInt();
-    rpwm = lpwm;
+    gv = Serial.parseInt();
     motion(lpwm,rpwm,HIGH,HIGH);
+    while (Serial.available()) Serial.read();
   }
+  Serial.print("lv:rv=");
   Serial.print(lv);
   Serial.print(":");
   Serial.print(rv);
-  Serial.print("<"); 
+  Serial.print(" lpwm:rpwm="); 
   Serial.print(lpwm);
   Serial.print(":");
   Serial.print(rpwm);
-  Serial.print(">");
+  Serial.print(" lmc:rmc=");
   Serial.print(lmc);
   Serial.print(":");
   Serial.print(rmc);
-  Serial.print("#");
+  Serial.print(" tic#");
   Serial.print(ti);
   Serial.print(" th: ");
   Serial.print(th);
   Serial.print(" av: ");
-  Serial.println(av);
-  if(th>0){ rpwm-=10; lpwm+=10; }
-  if(th<0){ rpwm+=10; lpwm-=10; }
+  Serial.print(av);
+  Serial.print(" gv: ");
+  Serial.println(gv);
   motion(lpwm,rpwm,HIGH,HIGH);
   delay(1000);
 }//read int or parseFloat for ..float...
