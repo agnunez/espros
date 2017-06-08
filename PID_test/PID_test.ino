@@ -1,58 +1,38 @@
 #include <ESP8266WiFi.h>
 #include <PID_v1.h>
-
 extern "C" {
 #include "user_interface.h"
 }
 
-int lpwm=0;
-int rpwm=0;
-int len=300;    // period in ms
-int lmc=0;      // left motor counter
-int rmc=0;   
-int lmc0=0;     // last encoder value 
-int rmc0=0;
-int ldir=1;     // left motor direction
-int rdir=1;
-int lv=0;       // left motor actual speed
-int rv=0;       // measured in n tics/timer period
-int ltp=0;      // left motor target position 
-float av, th;   // average & angular velocity
-int ti=0;
-int gv=0;        // goal velocity
-int period=100;    // timer period in ms
-double lIn,rIn,tIn,lOut,rOut,tOut,lSet,rSet,tSet;
+int lpwm=0, rpwm=0;  // motor pwm
+int lmc=0,  rmc=0;   // left motor counter
+int lmc0=0, rmc0=0;  // last encoder value 
+int ldir=1, rdir=1;  // motor direction
+double whesep= 0.135; // wheel separtion in m
+double whedia= 0.7;   // wheel diameter in m
+int CPR = 40;     // Encoder Count per Revolutions (double of holes using up & down interrupt)
+int period=200;   // sample timer period in ms
+double lv=0, rv=0;// motor speed innumber tics per period
+int ti=0;         // tic timer counter
+double lOut,rOut,lSet,rSet;   // PID output and demands
 double lkp=1,lki=0,lkd=0;     // Left wheel PID constants
 double rkp=1,rki=0,rkd=0;     // Right wheel PID constants
-double tkp=1,tki=0,tkd=0;     // Right wheel PID constants
+int kt=1000/period; // number of periods in 1sec
 
-//Specify the links and initial tuning parameters
 //PID(&Input, &Output, &Setpoint, Kp, Ki, Kd, Direction)
-PID lPID(&lIn, &lOut, &lSet,lkp,lki,lkd, DIRECT);
-PID rPID(&rIn, &rOut, &rSet,rkp,rki,rkd, DIRECT);
-PID tPID(&tIn, &tOut, &tSet,tkp,tki,tkd, DIRECT);
+PID lPID(&lv, &lOut, &lSet, lkp, lki, lkd, DIRECT);
+PID rPID(&rv, &rOut, &rSet, rkp, rki, rkd, DIRECT);
 
 os_timer_t myTimer;
 
-
-void pidupdate(){
-  rPID.Compute();
-  lPID.Compute();
-}
 // start of timerCallback
 void tic(void *pArg) {
-  lv=lmc-lmc0;            // lv left instant velocity
+  lv=(lmc-lmc0)*kt;    // left instant velocity tic/period
   lmc0=lmc;
-  rv=rmc-rmc0;            // rv right install velocity
+  rv=(rmc-rmc0)*kt;    // rv right install velocity
   rmc0=rmc;
-  th=rmc-lmc;             // angular position(*pi()/rstep(180))
-  av=(lv+rv)/2.;          // center forward velocity
   ti+=1;                  // tic counter
-  lIn=lv;
-  rIn=rv;
-  lpwm=lOut*4;
-  rpwm=rOut*4; 
-  motion(lpwm,rpwm,HIGH,HIGH);
+
 }
 
 void stop(void){      // Stop both motors
@@ -60,7 +40,7 @@ void stop(void){      // Stop both motors
     analogWrite(D2, 0);
 }
  
-void motion(int lpwm, int rpwm, int llevel, int rlevel) {  
+void motion(double lpwm, double rpwm, int llevel, int rlevel) {  
     if (llevel==HIGH) {
       ldir=1; 
     } else {
@@ -71,10 +51,6 @@ void motion(int lpwm, int rpwm, int llevel, int rlevel) {
     } else {
       rdir=-1;
     }
-    if(lpwm>1023) lpwm=1023;
-    if(rpwm>1023) rpwm=1023;
-    if(lpwm<0) lpwm=0;
-    if(rpwm<0) rpwm=0;
     analogWrite(D1, lpwm);
     analogWrite(D2, rpwm);
     digitalWrite(D3, llevel);
@@ -98,16 +74,17 @@ void setup() {
   attachInterrupt(D5, lencode, CHANGE); // Setup Interrupt 
   attachInterrupt(D6, rencode, CHANGE); // Setup Interrupt 
   sei();                                // Enable interrupts  
+ 
   int currentTime = millis();
   int cloopTime = currentTime;
   os_timer_setfn(&myTimer, tic, NULL);
   os_timer_arm(&myTimer, period, true);   // timer in ms
   lPID.SetSampleTime(period);
   rPID.SetSampleTime(period); 
-  tPID.SetSampleTime(period);  
+  lPID.SetOutputLimits(0, 1023);  
+  rPID.SetOutputLimits(0, 1023);  
   lPID.SetMode(AUTOMATIC);
   rPID.SetMode(AUTOMATIC);
-  tPID.SetMode(AUTOMATIC);
   Serial.begin(115200);
   Serial.println("Ready");
 }
@@ -121,7 +98,7 @@ void loop(){
     }
   } else {
     if (Serial.available() != 0) {
-      gv = Serial.parseInt();
+      int gv = Serial.parseInt();
       if(c=='s'){
         lSet=gv/10.;
         rSet=gv/10.;
@@ -142,37 +119,33 @@ void loop(){
       c=0;
     }
   }
-  Serial.print("lv:rv=");
+  Serial.print(" lSet: ");
+  Serial.print(lSet);
+  Serial.print(" rSet: ");
+  Serial.print(rSet);
+  Serial.print(" lv:");
   Serial.print(lv);
-  Serial.print(":");
+  Serial.print(" rv:");
   Serial.print(rv);
-  Serial.print(" lpwm:rpwm="); 
-  Serial.print(lpwm);
-  Serial.print(":");
-  Serial.print(rpwm);
-  Serial.print(" lmc:rmc=");
+  Serial.print(" lOut:"); 
+  Serial.print(lOut*4);
+  Serial.print(" rOut:");
+  Serial.print(rOut*4);
+  Serial.print(" lmc:");
   Serial.print(lmc);
-  Serial.print(":");
+  Serial.print(" rmc=");
   Serial.print(rmc);
   Serial.print(" tic#");
   Serial.print(ti);
-  Serial.print(" th: ");
-  Serial.print(th);
-  Serial.print(" av: ");
-  Serial.print(av);
-  Serial.print(" lSet: ");
-  Serial.print(lSet);
-  Serial.print(" lIn: ");
-  Serial.print(lIn);
-  Serial.print(" lOut: ");
-  Serial.print(lOut);
   Serial.print(" lkp: ");
   Serial.print(lkp);
   Serial.print(" lki: ");
   Serial.print(lki);
   Serial.print(" lkd: ");
   Serial.println(lkd);
-  pidupdate();
+  rPID.Compute();
+  lPID.Compute();
+  motion(lOut,rOut,HIGH,HIGH);  
   delay(1000);
-}//read int or parseFloat for ..float...
+}
 
