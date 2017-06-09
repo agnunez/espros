@@ -1,3 +1,4 @@
+// version 0.2 09-06-2017 07:25 https://github.com/agnunez/espros
 #include <ESP8266WiFi.h>
 #include <PID_v1.h>
 extern "C" {
@@ -11,7 +12,7 @@ int ldir=1, rdir=1;  // motor direction
 double whesep= 0.135; // wheel separtion in m
 double whedia= 0.7;   // wheel diameter in m
 int CPR = 40;     // Encoder Count per Revolutions (double of holes using up & down interrupt)
-int period=100;   // sample timer period in ms
+int period=200;   // sample timer period in ms
 double lv=0., rv=0.;// motor speed innumber tics per period
 int ti=0;         // tic timer counter
 double lOut,rOut,lSet,rSet;   // PID output and demands
@@ -29,14 +30,18 @@ os_timer_t myTimer;
 // start of timerCallback
 void tic(void *pArg) {
   
-  lv=(lmc-lmc0)*kt+1000./(millis() - llasttime);    // left instant velocity tic/period
+  lv=(lmc-lmc0)*kt; //+1000./(millis() - llasttime);    // left instant velocity tic/period
   lmc0=lmc;
-  rv=(rmc-rmc0)*kt+1000./(millis() - rlasttime);    // rv right install velocity
+  rv=(rmc-rmc0)*kt; //+1000./(millis() - rlasttime);    // rv right install velocity
   rmc0=rmc;
   
   ti+=1;                  // tic counter
-  rPID.Compute();
+  Serial.print("lv: ");
+  Serial.print(lv);
   lPID.Compute();
+  Serial.print("rv: ");
+  Serial.print(rv);
+  rPID.Compute();
   motion(lOut,rOut,HIGH,HIGH);  
 }
 
@@ -87,18 +92,18 @@ void setup() {
   pinMode(D4, OUTPUT); // 3A,4A aka D4
   pinMode(D5, INPUT); //  Left encoder
   pinMode(D6, INPUT); //  Right encoder
-  //attachInterrupt(D5, lencode, CHANGE); // Setup Interrupt 
-  //attachInterrupt(D6, rencode, CHANGE); // Setup Interrupt 
-  attachInterrupt(D5, lencode, RISING); // Setup Interrupt 
-  attachInterrupt(D6, rencode, RISING); // Setup Interrupt 
+  attachInterrupt(D5, lencode, CHANGE); // Setup Interrupt 
+  attachInterrupt(D6, rencode, CHANGE); // Setup Interrupt 
+  //attachInterrupt(D5, lencode, RISING); // Setup Interrupt 
+  //attachInterrupt(D6, rencode, RISING); // Setup Interrupt 
   sei();                                // Enable interrupts  
  
   //currentTime = millis();
   //cloopTime = currentTime;
   os_timer_setfn(&myTimer, tic, NULL);
   os_timer_arm(&myTimer, period, true);   // timer in ms
-  //lPID.SetSampleTime(period);
-  //rPID.SetSampleTime(period); 
+  lPID.SetSampleTime(period);
+  rPID.SetSampleTime(period); 
   lPID.SetOutputLimits(0, 1023);  
   rPID.SetOutputLimits(0, 1023);  
   lPID.SetMode(AUTOMATIC);
@@ -155,9 +160,9 @@ void loop(){
   Serial.print(" rSet: ");
   Serial.print(rSet);
   Serial.print(" lv:");
-  Serial.print(lv*1000);
+  Serial.print(lv);
   Serial.print(" rv:");
-  Serial.print(rv*1000);
+  Serial.print(rv);
   Serial.print(" lOut:"); 
   Serial.print(lOut);
   Serial.print(" rOut:");
