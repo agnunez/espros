@@ -1,49 +1,45 @@
-// version 0.2 09-06-2017 07:25 https://github.com/agnunez/espros
+// version 1.0 12-06-2017 00:20 https://github.com/agnunez/espros
 #include <ESP8266WiFi.h>
 #include <PID_v1.h>
 extern "C" {
 #include "user_interface.h"
 }
 
-int lpwm=0, rpwm=0;  // motor pwm
-int lmc=0,  rmc=0;   // left motor counter
-int lmc0=0, rmc0=0;  // last encoder value 
-int ldir=1, rdir=1;  // motor direction
+int lpwm=0, rpwm=0;   // motor pwm
+int lmc=0,  rmc=0;    // left motor counter
+int lmc0=0, rmc0=0;   // last encoder value 
+int ldir=1, rdir=1;   // motor direction
 double whesep= 0.135; // wheel separtion in m
 double whedia= 0.7;   // wheel diameter in m
-int CPR = 40;     // Encoder Count per Revolutions (double of holes using up & down interrupt)
-int period=200;   // sample timer period in ms
+int CPR = 40;         // Encoder Count per Revolutions 
+int period=50;        // PID sample timer period in ms
 double lv=0., rv=0., lvt=0., rvt=0. ;// motor speed innumber tics per period with two methods
-int ti=0;         // tic timer counter
-double lOut,rOut,lSet,rSet;   // PID output and demands
-double lkp=10,lki=0,lkd=0;     // Left wheel PID constants
-double rkp=10,rki=0,rkd=0;     // Right wheel PID constants
-int kt=period/1000; // number of periods in 1sec
+int ti=0;             // tic timer counter
+double lIn,rIn,lOut,rOut,lSet=0,rSet=0;   // PID Input Signal, Output command and Setting speed for each wheel 
+double lkp=0.3,lki=5,lkd=0.1;     // Left/right wheel PID constants. Can be modiffied while running with:
+double rkp=0.3,rki=5,rkd=0.1;     // s nnn (setting point), p nnn (kp), i nnn (ki), d nnn (kd). nnn is divided by 10 to get decimals nnn -> nn.n
+double kt=1000/period;            // number of periods/sec
 int rcurrenttime, rlasttime, lcurrenttime, llasttime;
 
 //PID(&Input, &Output, &Setpoint, Kp, Ki, Kd, Direction)
-PID lPID(&lv, &lOut, &lSet, lkp, lki, lkd, DIRECT);
-PID rPID(&rv, &rOut, &rSet, rkp, rki, rkd, DIRECT);
+PID lPID(&lIn, &lOut, &lSet, lkp, lki, lkd, DIRECT);
+PID rPID(&rIn, &rOut, &rSet, rkp, rki, rkd, DIRECT);
 
 os_timer_t myTimer;
 
-// start of timerCallback
+// start of timerCallback, repeat every "period"
 void tic(void *pArg) {
-  
-  lv=(lmc-lmc0)*kt; //+1000./(millis() - llasttime);    // left instant velocity tic/period
+  lv=(lmc-lmc0);     
   lmc0=lmc;
-  rv=(rmc-rmc0)*kt; //+1000./(millis() - rlasttime);    // rv right install velocity
+  rv=(rmc-rmc0); 
   rmc0=rmc;
-  if(lv>0) lv = lvt;
-  if(rv>0) rv = rvt;
+  if(lv>=1.) { lIn = lvt; } else { lIn = 0; } // left instant velocity tic/period * period/sec = tic/sec
+  if(rv>=1.) { rIn = rvt; } else { rIn = 0; } 
   ti+=1;                  // tic counter
-  Serial.print("lv: ");
-  Serial.print(lv);
-  Serial.print(" lvt: ");
-  Serial.print(lvt);
+  Serial.print(lIn);
+  Serial.print(",");
   lPID.Compute();
-  Serial.print("rv: ");
-  Serial.print(rv);
+  Serial.println(rIn);
   rPID.Compute();
   motion(lOut,rOut,HIGH,HIGH);  
 }
@@ -74,7 +70,6 @@ void motion(double lpwm, double rpwm, int llevel, int rlevel) {
     digitalWrite(D4, rlevel);
 }
 void lencode() {          // GPIO ISR Interrupt service routines for encoder changes
-  
   lcurrenttime = millis();
   lvt = 1000./(lcurrenttime - llasttime);
   llasttime = lcurrenttime;
@@ -93,16 +88,13 @@ void setup() {
   pinMode(D2, OUTPUT); // 3,4EN aka D2 pwm right
   pinMode(D3, OUTPUT); // 1A,2A aka D3
   pinMode(D4, OUTPUT); // 3A,4A aka D4
-  pinMode(D5, INPUT); //  Left encoder
-  pinMode(D6, INPUT); //  Right encoder
-  attachInterrupt(D5, lencode, CHANGE); // Setup Interrupt 
-  attachInterrupt(D6, rencode, CHANGE); // Setup Interrupt 
-  //attachInterrupt(D5, lencode, RISING); // Setup Interrupt 
-  //attachInterrupt(D6, rencode, RISING); // Setup Interrupt 
-  sei();                                // Enable interrupts  
- 
-  //currentTime = millis();
-  //cloopTime = currentTime;
+  pinMode(D5, INPUT);  // Left encoder
+  pinMode(D6, INPUT);  // Right encoder
+  //attachInterrupt(D5, lencode, CHANGE); // Setup Interrupt 
+  //attachInterrupt(D6, rencode, CHANGE); // Setup Interrupt 
+  attachInterrupt(D5, lencode, RISING);   // Setup Interrupt 
+  attachInterrupt(D6, rencode, RISING);   // Setup Interrupt 
+  sei();                                  // Enable interrupts  
   os_timer_setfn(&myTimer, tic, NULL);
   os_timer_arm(&myTimer, period, true);   // timer in ms
   lPID.SetSampleTime(period);
@@ -114,7 +106,8 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Ready");
 }
-char c=0;
+
+char c=0;             // input char from keys
 void loop(){
   // watch for input
   if(c==0){
@@ -148,24 +141,17 @@ void loop(){
       }
       while (Serial.available()) Serial.read();
       c=0;
-      //lPID.SetMode(MANUAL);
-      //rPID.SetMode(MANUAL);
-      //lPID.SetSampleTime(period);
-      //rPID.SetSampleTime(period); 
-      //lPID.SetOutputLimits(0, 1023);  
-      //rPID.SetOutputLimits(0, 1023);  
-      //lPID.SetMode(AUTOMATIC);
-      //rPID.SetMode(AUTOMATIC);
     }
   }
-  Serial.print(" lSet: ");
+  /*
+  Serial.print("***lSet: ");
   Serial.print(lSet);
   Serial.print(" rSet: ");
   Serial.print(rSet);
   Serial.print(" lv:");
-  Serial.print(lv);
+  Serial.print(lIn);
   Serial.print(" rv:");
-  Serial.print(rv);
+  Serial.print(rIn);
   Serial.print(" lOut:"); 
   Serial.print(lOut);
   Serial.print(" rOut:");
@@ -182,6 +168,7 @@ void loop(){
   Serial.print(lki);
   Serial.print(" lkd: ");
   Serial.println(lkd);
+*/
   delay(1000);
 }
 
