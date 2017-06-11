@@ -64,6 +64,19 @@ test rviz by running
 
 $ rosrun rviz rviz
 
+PID_test
+
+This is a stand-alone tool to tune differential drive robot PID's. You can install this sketch in your ESP8266 connected to the motors with encoders, and use the Arduino IDE monitor to send commands, while visualizing speed or other parameters in real time.
+Commands available are:
+  s nnn (set speed of both motors to nn.n encoder tick per second. (nnn is divide by 10))
+  p nnn (set proportional constant Kp of both motor pid's to nn.n)
+  i nnn (set integral constant Ki of both motor pid's to nn.n)
+  d nnn (set derivative constant Kp of both motors pid's to nn.n)
+while doing this, you will keep receiving the speeds of both motors in CSV format, so one can cut&paste this on a spreadsheet and draw a chart with variations
+Inside the code, there are other parameters that can be preconfigured like initial Kp,Ki,Kd PID period (implemented in a timer loop), and other constants.
+The parameters preconfigured are suited for simple car but with DC motor and simple encoder (no quadrature), but can be easily modified for other robots.
+
+
 This code is part of a much larger project to build an open source ROS Robot, called Gara
 
 Have fun,
