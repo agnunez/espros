@@ -13,12 +13,12 @@ double whesep= 0.135; // wheel separtion in m
 double whedia= 0.7;   // wheel diameter in m
 int CPR = 40;     // Encoder Count per Revolutions (double of holes using up & down interrupt)
 int period=200;   // sample timer period in ms
-double lv=0., rv=0.;// motor speed innumber tics per period
+double lv=0., rv=0., lvt=0., rvt=0. ;// motor speed innumber tics per period with two methods
 int ti=0;         // tic timer counter
 double lOut,rOut,lSet,rSet;   // PID output and demands
 double lkp=10,lki=0,lkd=0;     // Left wheel PID constants
 double rkp=10,rki=0,rkd=0;     // Right wheel PID constants
-int kt=1000/period; // number of periods in 1sec
+int kt=period/1000; // number of periods in 1sec
 int rcurrenttime, rlasttime, lcurrenttime, llasttime;
 
 //PID(&Input, &Output, &Setpoint, Kp, Ki, Kd, Direction)
@@ -34,10 +34,13 @@ void tic(void *pArg) {
   lmc0=lmc;
   rv=(rmc-rmc0)*kt; //+1000./(millis() - rlasttime);    // rv right install velocity
   rmc0=rmc;
-  
+  if(lv>0) lv = lvt;
+  if(rv>0) rv = rvt;
   ti+=1;                  // tic counter
   Serial.print("lv: ");
   Serial.print(lv);
+  Serial.print(" lvt: ");
+  Serial.print(lvt);
   lPID.Compute();
   Serial.print("rv: ");
   Serial.print(rv);
@@ -73,13 +76,13 @@ void motion(double lpwm, double rpwm, int llevel, int rlevel) {
 void lencode() {          // GPIO ISR Interrupt service routines for encoder changes
   
   lcurrenttime = millis();
-  //lv = 1000./(lcurrenttime - llasttime);
+  lvt = 1000./(lcurrenttime - llasttime);
   llasttime = lcurrenttime;
   lmc=lmc+ldir;
 }
 void rencode(){ 
   rcurrenttime = millis();
-  //rv = 1000./(rcurrenttime - rlasttime);
+  rvt = 1000./(rcurrenttime - rlasttime);
   rlasttime = rcurrenttime;
   rmc=rmc+rdir;
 }
