@@ -68,7 +68,9 @@ PID_test
 
 This is a stand-alone tool to tune differential drive robot PID's. You can install this sketch in your ESP8266 connected to the motors with encoders, and use the Arduino IDE monitor to send commands, while visualizing speed or other parameters in real time.
 Commands available are:
-  s nnn (set speed of both motors to nn.n encoder tick per second. (nnn is divide by 10))
+  s     (show current PID constants settings)
+  r nnn (set speed of rght motors to nn.n encoder tick per second. (nnn is divide by 10))
+  l nnn (set speed of left motors to nn.n encoder tick per second. (nnn is divide by 10))
   p nnn (set proportional constant Kp of both motor pid's to nn.n)
   i nnn (set integral constant Ki of both motor pid's to nn.n)
   d nnn (set derivative constant Kp of both motors pid's to nn.n)
