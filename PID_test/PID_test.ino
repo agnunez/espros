@@ -17,7 +17,7 @@ int CPR = 40;         // Encoder Count per Revolutions
 int period=50;        // PID sample timer period in ms
 double lv=0., rv=0., lvt=0., rvt=0. ;// motor speed innumber tics per period with two methods
 int ti=0;             // tic timer counter
-double lIn,rIn,lOut,rOut,lSet=20,rSet=20;   // PID Input Signal, Output command and Setting speed for each wheel 
+double lIn,rIn,lOut,rOut,lSet=0,rSet=0;   // PID Input Signal, Output command and Setting speed for each wheel 
 double lkp=0.5,lki=10,lkd=0.0;     // Left/right wheel PID constants. Can be modiffied while running with:
 double rkp=0.5,rki=10,rkd=0.0;     // s nnn (setting point), p nnn (kp), i nnn (ki), d nnn (kd). nnn is divided by 10 to get decimals nnn -> nn.n
 double kt=1000/period;            // number of periods/sec
@@ -43,8 +43,8 @@ void tic(void *pArg) {
   rmc0=rmc;
   lIn = lv*kt;
   rIn = rv*kt;
-  //lIn=abs(lvt)*sgn(lv);
-  //rIn=abs(rvt)*sgn(rv);
+  if(abs(lv)>=1) lIn=abs(lvt)*sgn(lv); // use timing to calculate velocity only if ticks are greater than one
+  if(abs(rv)>=1) rIn=abs(rvt)*sgn(rv); // to avoid problems with sign and inertia for a simple encoder (no quadrature)
   lPID.Compute();
   rPID.Compute();
   motion(lOut,rOut); 
@@ -127,10 +127,10 @@ void setup() {
   pinMode(D4, OUTPUT); // 3A,4A aka D4
   pinMode(D5, INPUT);  // Left encoder
   pinMode(D6, INPUT);  // Right encoder
-  attachInterrupt(D5, lencode, CHANGE); // Setup Interrupt 
-  attachInterrupt(D6, rencode, CHANGE); // Setup Interrupt 
-  //attachInterrupt(D5, lencode, RISING);   // Setup Interrupt 
-  //attachInterrupt(D6, rencode, RISING);   // Setup Interrupt 
+  //attachInterrupt(D5, lencode, CHANGE); // Setup Interrupt 
+  //attachInterrupt(D6, rencode, CHANGE); // Setup Interrupt 
+  attachInterrupt(D5, lencode, RISING);   // Setup Interrupt 
+  attachInterrupt(D6, rencode, RISING);   // Setup Interrupt 
   sei();                                  // Enable interrupts  
   os_timer_setfn(&myTimer, tic, NULL);
   os_timer_arm(&myTimer, period, true);   // timer in ms
@@ -191,10 +191,6 @@ void loop(){
     Serial.print(lIn);
     Serial.print(",");
     Serial.print(rIn);    
-    Serial.print(",");
-    Serial.print(lvt);
-    Serial.print(",");
-    Serial.print(rvt);    
     Serial.print(",");
     Serial.print(lOut);    
     Serial.print(",");
