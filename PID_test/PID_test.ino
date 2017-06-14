@@ -17,7 +17,7 @@ int CPR = 40;         // Encoder Count per Revolutions
 int period=50;        // PID sample timer period in ms
 double lv=0., rv=0., lvt=0., rvt=0. ;// motor speed innumber tics per period with two methods
 int ti=0;             // tic timer counter
-double lIn,rIn,lOut,rOut,lSet=0,rSet=0;   // PID Input Signal, Output command and Setting speed for each wheel 
+double lIn,rIn,lOut,rOut,lSet=30,rSet=30;   // PID Input Signal, Output command and Setting speed for each wheel 
 double lkp=0.5,lki=10,lkd=0.0;     // Left/right wheel PID constants. Can be modiffied while running with:
 double rkp=0.5,rki=10,rkd=0.0;     // s nnn (setting point), p nnn (kp), i nnn (ki), d nnn (kd). nnn is divided by 10 to get decimals nnn -> nn.n
 double kt=1000/period;            // number of periods/sec
