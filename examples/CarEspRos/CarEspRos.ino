@@ -35,9 +35,9 @@ int rtp=0;
 // WiFi Definitions //
 //////////////////////
 // WiFi configuration. Replace '***' with your data
-const char* ssid = "GTC-Guest";
-const char* password = ".gtcguest.";
-IPAddress server(161,72,94,217);      // Set the rosserial socket server IP address
+const char* ssid = "***";
+const char* password = "***";
+IPAddress server(192,168,1,***);      // Set the rosserial socket server IP address
 const uint16_t serverPort = 11411;    // Set the rosserial socket server port
 
 void stop(void){      // Stop both motors

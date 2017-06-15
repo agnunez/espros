@@ -39,10 +39,10 @@ int rtp=0;
 //////////////////////
 // WiFi Definitions //
 //////////////////////
-const char* ssid = "GTC-Guest";
-const char* password = ".gtcguest.";
+const char* ssid = "***";
+const char* password = "***";
 
-IPAddress server(161,72,94,217); // your ROS server IP here
+IPAddress server(192,168,1,***); // your ROS server IP here
 IPAddress ip_address;
 int status = WL_IDLE_STATUS;
 
