@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////////////////////
 //
-// Wifi ROS Car with ESP8266 and ultrasonic range servo. v3.1 14-Jun-207
+// Wifi ROS Car with ESP8266 and ultrasonic range servo. v3.2 09:50 15-Jun-2017
 // Implements following Ros objects:
 //
 //   - odom.    Using simple wheel encoders (no quadrature)
@@ -25,7 +25,7 @@
 // https://github.com/agnunez/espros.git
 //
 // MIT License 2017 Agustin Nunez
-//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <ESP8266WiFi.h>
 #include <ros.h>
@@ -46,7 +46,7 @@ extern "C" {
 
 // Init constants and global variables
 
-#define DEBUG 1
+#define DEBUG 0
 #define TRIGGER D8  // ultrasonic trigger pin
 #define ECHO    D0  // ultrasonic echo pin  (!!Note: use 5v Vcc on ultrasonic board & a 2k,1k divider for ECHO GPIO protection)
 
@@ -82,28 +82,29 @@ int sp=10;      // number of loops among range measurements
 
 // WiFi configuration. Replace '***' with your data
 
-const char* ssid = "GTC-Guest";
-const char* password = ".gtcguest.";
-IPAddress server(161,72,124,143);      // Set the rosserial socket server IP address
+const char* ssid = "***";
+const char* password = "***";
+IPAddress server(192,168,1,***);      // Set the rosserial socket ROSCORE SERVER IP address
 const uint16_t serverPort = 11411;    // Set the rosserial socket server port
 
 
 // Functions definitions //
 
 void setupWiFi() {                    // connect to ROS server as as a client
-  Serial.begin(115200);               // Use ESP8266 serial only for to monitor the process
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);
+  if(DEBUG){
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
+    WiFi.begin(ssid, password);
+  }
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
   }
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+  if(DEBUG){
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+  }
 }
 
 static inline int8_t sgn(int val) {   // Better sgn function definition
@@ -187,10 +188,12 @@ void cmd_velCallback( const geometry_msgs::Twist& CVel){
     //write new command speeds to global vars 
     lSet = left_vel;
     rSet = right_vel;
-    Serial.print("cmd_vel");
-    Serial.print(lSet);
-    Serial.print(",");
-    Serial.println(rSet);
+    if(DEBUG){
+      Serial.print("cmd_vel");
+      Serial.print(lSet);
+      Serial.print(",");
+      Serial.println(rSet);
+    }
 }
 
 int sstep(){                  // servo swaping commands
@@ -234,12 +237,12 @@ ros::Publisher leftenc("/car/lencoder", &int_msg);
 ros::Publisher rightenc("/car/rencoder", &int_msg);
 ros::Publisher angle("/car/angle", &int_msg);      // servo angle
 */
-ros::Publisher pub_range("/ultrasound", &range_msg);
-ros::Publisher odom_pub("/odom", &odom); 
-ros::Publisher Pub ("ard_odom", &odom_msg);
+ros::Publisher pub_range("/car/ultrasound", &range_msg);
+ros::Publisher odom_pub("/car/odom", &odom); 
+ros::Publisher Pub ("/car/ard_odom", &odom_msg);
 
 // ROS SUBSCRIBERS
-ros::Subscriber<geometry_msgs::Twist> Sub("cmd_vel", &cmd_velCallback );
+ros::Subscriber<geometry_msgs::Twist> Sub("/car/cmd_vel", &cmd_velCallback );
 
 // ros variables
 double x = 1.0;
@@ -363,7 +366,7 @@ void loop() {
     odom_pub.publish(&odom);
 
   } else {
-    Serial.println("Not Connected");
+    if(DEBUG) Serial.println("Not Connected");
   }
   nh.spinOnce();
   // Loop aprox. every  
